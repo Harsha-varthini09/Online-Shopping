@@ -1,0 +1,124 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>My Cart | Elegance Store</title>
+
+    <link rel="stylesheet" href="css/style.css">
+
+    <style>
+        .cart-section {
+            min-height: 70vh;
+            padding: 60px 8%;
+        }
+
+        .cart-heading {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .cart-card {
+            max-width: 900px;
+            margin: auto;
+            padding: 35px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .empty-cart {
+            text-align: center;
+            padding: 40px 10px;
+        }
+
+        .empty-cart p {
+            margin: 15px 0 25px;
+        }
+
+        .cart-icon {
+            font-size: 55px;
+        }
+
+        @media (max-width: 600px) {
+            .cart-card {
+                padding: 22px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- NAVIGATION BAR -->
+
+    <nav class="navbar">
+
+        <a href="index.html" class="logo">
+            Elegance.
+        </a>
+
+        <ul class="nav-links">
+
+            <li><a href="index.html">Home</a></li>
+
+            <li><a href="products.html">Products</a></li>
+
+            <li><a href="cart.html">Cart</a></li>
+
+        </ul>
+
+    </nav>
+
+
+    <!-- CART SECTION -->
+
+    <section class="cart-section">
+
+        <div class="cart-heading">
+
+            <h1>My Shopping Cart</h1>
+
+            <p>Review the products you have selected.</p>
+
+        </div>
+
+        <div class="cart-card">
+
+            <div class="empty-cart">
+
+                <div class="cart-icon">🛒</div>
+
+                <h2>Your Cart is Empty</h2>
+
+                <p>
+                    You haven't added any products to your cart yet.
+                </p>
+
+                <a href="products.html" class="btn">
+                    Continue Shopping
+                </a>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- FOOTER -->
+
+    <footer class="footer">
+
+        <p>
+            © 2026 Elegance Store. All Rights Reserved.
+        </p>
+
+    </footer>
+
+</body>
+
+</html>

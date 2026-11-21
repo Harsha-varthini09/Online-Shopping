@@ -1,0 +1,397 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Our Products | Elegance Store</title>
+
+    <link rel="stylesheet" href="css/style.css">
+
+    <style>
+
+        .products-banner {
+            padding: 65px 20px;
+            text-align: center;
+            background: linear-gradient(135deg, #EDE5F7, #F2C6D0);
+        }
+
+        .products-banner p {
+            margin-top: 10px;
+        }
+
+        .products-section {
+            padding: 45px 0 75px;
+        }
+
+        .products-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .filter-box {
+            width: 200px;
+        }
+
+        .products-layout {
+            display: grid;
+            grid-template-columns: 230px 1fr;
+            gap: 30px;
+        }
+
+        .filter-sidebar {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            height: fit-content;
+        }
+
+        .filter-sidebar h3 {
+            margin-bottom: 18px;
+        }
+
+        .filter-group {
+            margin-bottom: 25px;
+        }
+
+        .filter-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: var(--plum);
+        }
+
+        .filter-group input,
+        .filter-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: 0.3s;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 210px;
+            object-fit: cover;
+            background: var(--lavender-light);
+        }
+
+        .product-info {
+            padding: 18px;
+        }
+
+        .product-info h3 {
+            font-size: 19px;
+            margin-bottom: 8px;
+        }
+
+        .product-price {
+            color: var(--rose);
+            font-size: 19px;
+            font-weight: 700;
+            margin: 12px 0;
+        }
+
+        .product-info .btn {
+            width: 100%;
+        }
+
+        .product-category {
+            font-size: 12px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .empty-products {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 45px 20px;
+            background: white;
+            border-radius: 16px;
+        }
+
+        @media (max-width: 900px) {
+
+            .products-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .product-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+        }
+
+        @media (max-width: 550px) {
+
+            .product-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .products-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-box {
+                width: 100%;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <!-- NAVIGATION BAR -->
+
+    <nav class="navbar">
+
+        <a href="index.html" class="logo">
+            Elegance.
+        </a>
+
+        <ul class="nav-links">
+
+            <li>
+                <a href="index.html">Home</a>
+            </li>
+
+            <li>
+                <a href="products.html">Products</a>
+            </li>
+
+            <li>
+                <a href="login.html">Login</a>
+            </li>
+
+            <li>
+                <a href="register.html">Register</a>
+            </li>
+
+        </ul>
+
+    </nav>
+
+
+    <!-- PRODUCTS BANNER -->
+
+    <section class="products-banner">
+
+        <h1>Discover Our Collection</h1>
+
+        <p>
+            Explore beautiful products selected just for you.
+        </p>
+
+    </section>
+
+
+    <!-- PRODUCTS SECTION -->
+
+    <section class="products-section">
+
+        <div class="container">
+
+            <!-- SEARCH AND SORT -->
+
+            <div class="products-toolbar">
+
+                <input
+                    type="search"
+                    id="product-search"
+                    class="form-control search-box"
+                    placeholder="Search products..."
+                >
+
+                <select
+                    id="sort-products"
+                    class="form-control filter-box"
+                >
+
+                    <option value="">Sort Products</option>
+
+                    <option value="low">
+                        Price: Low to High
+                    </option>
+
+                    <option value="high">
+                        Price: High to Low
+                    </option>
+
+                    <option value="name">
+                        Name: A to Z
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div class="products-layout">
+
+                <!-- FILTER SIDEBAR -->
+
+                <aside class="filter-sidebar">
+
+                    <h3>Filter Products</h3>
+
+                    <div class="filter-group">
+
+                        <label for="category-filter">
+                            Category
+                        </label>
+
+                        <select id="category-filter">
+
+                            <option value="">
+                                All Categories
+                            </option>
+
+                            <option value="Fashion">
+                                Fashion
+                            </option>
+
+                            <option value="Accessories">
+                                Accessories
+                            </option>
+
+                            <option value="Home & Living">
+                                Home & Living
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="filter-group">
+
+                        <label for="min-price">
+                            Minimum Price (₹)
+                        </label>
+
+                        <input
+                            type="number"
+                            id="min-price"
+                            min="0"
+                            placeholder="Minimum price"
+                        >
+
+                    </div>
+
+
+                    <div class="filter-group">
+
+                        <label for="max-price">
+                            Maximum Price (₹)
+                        </label>
+
+                        <input
+                            type="number"
+                            id="max-price"
+                            min="0"
+                            placeholder="Maximum price"
+                        >
+
+                    </div>
+
+                    <button
+                        type="button"
+                        class="btn"
+                        id="apply-filter"
+                    >
+                        Apply Filters
+                    </button>
+
+                </aside>
+
+
+                <!-- PRODUCT DISPLAY AREA -->
+
+                <div>
+
+                    <div class="product-grid" id="product-grid">
+
+                        <div class="empty-products">
+
+                            <h3>Products will appear here</h3>
+
+                            <p>
+                                Your product collection will be
+                                loaded from Firebase.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- FOOTER -->
+
+    <footer class="footer">
+
+        <p>
+            © 2026 Elegance Store. All Rights Reserved.
+        </p>
+
+    </footer>
+
+
+    <!-- BACKEND JAVASCRIPT FILES -->
+
+
+<script src="../Backend/firebase-config.js"></script>
+<script src="../Backend/firestore-api.js"></script>
+<script src="../Backend/product-api.js"></script>
+<script src="../Backend/category-api.js"></script>
+<script src="../Backend/cart-api.js"></script>
+<script src="../Backend/utility.js"></script>
+<script src="js/product.js"></script>
+
+
+</body>
+
+</html>

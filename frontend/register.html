@@ -1,0 +1,389 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Register | Elegance Store</title>
+
+    <link rel="stylesheet" href="css/style.css">
+
+    <style>
+
+        body {
+            min-height: 100vh;
+        }
+
+        .register-page {
+            min-height: 90vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+
+            background:
+                linear-gradient(
+                    rgba(73, 59, 89, 0.30),
+                    rgba(73, 59, 89, 0.30)
+                ),
+                url('https://images.unsplash.com/photo-1441986300917-64674bd600d8')
+                center/cover no-repeat;
+        }
+
+        .register-card {
+            width: 100%;
+            max-width: 480px;
+            background: rgba(255, 255, 255, 0.97);
+            padding: 35px;
+            border-radius: 24px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .register-heading {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .register-heading h1 {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .register-heading p {
+            font-size: 14px;
+        }
+
+        .register-card .btn {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .register-links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .register-links a {
+            color: var(--rose);
+            font-weight: 700;
+        }
+
+        #register-message {
+            margin-top: 18px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        @media (max-width: 480px) {
+            .register-card {
+                padding: 25px 20px;
+            }
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <!-- NAVIGATION BAR -->
+
+    <nav class="navbar">
+
+        <a href="index.html" class="logo">
+            Elegance.
+        </a>
+
+        <ul class="nav-links">
+
+            <li>
+                <a href="index.html">Home</a>
+            </li>
+
+            <li>
+                <a href="index.html#categories">Categories</a>
+            </li>
+
+            <li>
+                <a href="login.html">Login</a>
+            </li>
+
+            <li>
+                <a href="register.html">Register</a>
+            </li>
+
+        </ul>
+
+    </nav>
+
+
+    <!-- REGISTRATION SECTION -->
+
+    <section class="register-page">
+
+        <div class="register-card">
+
+            <div class="register-heading">
+
+                <h1>Create Account</h1>
+
+                <p>
+                    Join us and enjoy your shopping experience.
+                </p>
+
+            </div>
+
+
+            <!-- REGISTRATION FORM -->
+
+            <form id="register-form">
+
+                <div class="form-group">
+
+                    <label for="name">
+                        Full Name
+                    </label>
+
+                    <input
+                        type="text"
+                        id="name"
+                        class="form-control"
+                        placeholder="Enter your full name"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="email">
+                        Email Address
+                    </label>
+
+                    <input
+                        type="email"
+                        id="email"
+                        class="form-control"
+                        placeholder="Enter your email"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="mobile">
+                        Mobile Number
+                    </label>
+
+                    <input
+                        type="tel"
+                        id="mobile"
+                        class="form-control"
+                        placeholder="Enter your mobile number"
+                        pattern="[0-9]{10}"
+                        maxlength="10"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="password">
+                        Password
+                    </label>
+
+                    <input
+                        type="password"
+                        id="password"
+                        class="form-control"
+                        placeholder="Create a password"
+                        minlength="6"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="confirm-password">
+                        Confirm Password
+                    </label>
+
+                    <input
+                        type="password"
+                        id="confirm-password"
+                        class="form-control"
+                        placeholder="Re-enter your password"
+                        minlength="6"
+                        required
+                    >
+
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="btn"
+                    id="register-button"
+                >
+                    Create Account
+                </button>
+
+                <p id="register-message"></p>
+
+            </form>
+
+
+            <!-- LOGIN LINK -->
+
+            <div class="register-links">
+
+                <p>
+                    Already have an account?
+
+                    <a href="login.html">
+                        Login
+                    </a>
+                </p>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- FOOTER -->
+
+    <footer class="footer">
+
+        <p>
+            © 2026 Elegance Store. All Rights Reserved.
+        </p>
+
+    </footer>
+
+
+    <!-- BACKEND JAVASCRIPT FILES -->
+
+    <script src="../Backend/firebase-config.js"></script>
+
+    <script src="../Backend/firestore-api.js"></script>
+
+    <script src="../Backend/auth-api.js"></script>
+
+    <script src="../Backend/utility.js"></script>
+
+    <script src="../Backend/user-api.js"></script>
+
+    <script src="../Backend/auth-service.js"></script>
+
+
+    <!-- REGISTRATION JAVASCRIPT -->
+
+    <script>
+
+        const registerForm =
+            document.getElementById("register-form");
+
+        const registerMessage =
+            document.getElementById("register-message");
+
+        const registerButton =
+            document.getElementById("register-button");
+
+
+        registerForm.addEventListener("submit", async function (event) {
+
+            event.preventDefault();
+
+
+            const name =
+                document.getElementById("name").value.trim();
+
+            const email =
+                document.getElementById("email").value.trim();
+
+            const mobile =
+                document.getElementById("mobile").value.trim();
+
+            const password =
+                document.getElementById("password").value;
+
+            const confirmPassword =
+                document.getElementById("confirm-password").value;
+
+
+            // CHECK PASSWORD MATCH
+
+            if (password !== confirmPassword) {
+
+                registerMessage.className = "message-error";
+
+                registerMessage.textContent =
+                    "Passwords do not match.";
+
+                return;
+            }
+
+
+            // DISABLE BUTTON WHILE REGISTERING
+
+            registerButton.disabled = true;
+
+            registerButton.textContent = "Creating Account...";
+
+            registerMessage.textContent = "";
+
+
+            try {
+
+                const result = await registerCustomer(
+                    email,
+                    password
+                );
+
+
+                registerMessage.className = "message-success";
+
+                registerMessage.textContent =
+                    result.message;
+
+
+                registerForm.reset();
+
+
+            } catch (error) {
+
+                console.error("Registration Error:", error);
+
+                registerMessage.className = "message-error";
+
+                registerMessage.textContent =
+                    error.message ||
+                    error.error?.message ||
+                    "Registration failed. Please try again.";
+
+            }
+
+
+            registerButton.disabled = false;
+
+            registerButton.textContent = "Create Account";
+
+        });
+
+    </script>
+
+</body>
+
+</html>

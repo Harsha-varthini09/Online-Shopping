@@ -1,0 +1,345 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Login | Elegance Store</title>
+
+    <!-- Existing CSS file -->
+    <link rel="stylesheet" href="css/style.css">
+
+    <style>
+        /* LOGIN PAGE */
+
+        body {
+            min-height: 100vh;
+        }
+
+        .login-page {
+            min-height: 90vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+
+            background:
+                linear-gradient(
+                    rgba(73, 59, 89, 0.25),
+                    rgba(73, 59, 89, 0.25)
+                ),
+                url('https://images.unsplash.com/photo-1483985988355-763728e1935b')
+                center/cover no-repeat;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 430px;
+            background: rgba(255, 255, 255, 0.96);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .login-heading {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .login-heading h1 {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .login-heading p {
+            font-size: 14px;
+        }
+
+        .login-card .btn {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .login-links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .login-links a {
+            color: var(--rose);
+            font-weight: 700;
+        }
+
+        #login-message {
+            margin-top: 18px;
+            text-align: center;
+            font-size: 14px;
+        }
+        /* LOGIN BUTTON WHILE PROCESSING */
+
+#login-button {
+    background-color: var(--rose);
+    color: white;
+    transition: background-color 0.3s ease;
+}
+
+#login-button:disabled {
+    background-color: #493B59;
+    color: white;
+    cursor: not-allowed;
+    opacity: 1;
+}
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 28px 22px;
+            }
+        }
+        #login-button:active {
+    background-color: #493B59;
+    color: white;
+}
+    </style>
+
+</head>
+
+<body>
+
+    <!-- NAVIGATION BAR -->
+
+    <nav class="navbar">
+
+        <a href="index.html" class="logo">
+            Elegance.
+        </a>
+
+        <ul class="nav-links">
+
+            <li>
+                <a href="index.html">Home</a>
+            </li>
+
+            <li>
+                <a href="index.html#categories">Categories</a>
+            </li>
+
+            <li>
+                <a href="login.html">Login</a>
+            </li>
+
+            <li>
+                <a href="register.html">Register</a>
+            </li>
+
+        </ul>
+
+    </nav>
+
+
+    <!-- LOGIN SECTION -->
+
+    <section class="login-page">
+
+        <div class="login-card">
+
+            <div class="login-heading">
+
+                <h1>Welcome Back!</h1>
+
+                <p>
+                    Sign in to continue your shopping journey.
+                </p>
+
+            </div>
+
+
+            <!-- LOGIN FORM -->
+
+            <form id="login-form">
+
+                <div class="form-group">
+
+                    <label for="email">
+                        Email Address
+                    </label>
+
+                    <input
+                        type="email"
+                        id="email"
+                        class="form-control"
+                        placeholder="Enter your email"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="password">
+                        Password
+                    </label>
+
+                    <input
+                        type="password"
+                        id="password"
+                        class="form-control"
+                        placeholder="Enter your password"
+                        required
+                    >
+
+                </div>
+
+
+                <div style="text-align: right; margin-bottom: 15px;">
+
+                    <a href="forgot-password.html">
+                        Forgot Password?
+                    </a>
+
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="btn"
+                    id="login-button"
+                >
+                    Login
+                </button>
+
+                <p id="login-message"></p>
+
+            </form>
+
+
+            <!-- REGISTRATION LINK -->
+
+            <div class="login-links">
+
+                <p>
+                    Don't have an account?
+
+                    <a href="register.html">
+                        Create Account
+                    </a>
+                </p>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- FOOTER -->
+
+    <footer class="footer">
+
+        <p>
+            © 2026 Elegance Store. All Rights Reserved.
+        </p>
+
+    </footer>
+
+
+    <!-- FIREBASE BACKEND FILES -->
+
+    <script src="../Backend/firebase-config.js"></script>
+
+    <script src="../Backend/firestore-api.js"></script>
+
+    <script src="../Backend/auth-api.js"></script>
+
+    <script src="../Backend/utility.js"></script>
+
+    <script src="../Backend/user-api.js"></script>
+
+    <script src="../Backend/auth-service.js"></script>
+
+
+    <!-- LOGIN JAVASCRIPT -->
+
+    <script>
+
+        
+const loginForm =
+    document.getElementById("login-form");
+
+const loginMessage =
+    document.getElementById("login-message");
+
+const loginButton =
+    document.getElementById("login-button");
+
+
+loginForm.addEventListener("submit", async function (event) {
+
+    event.preventDefault();
+
+    const email =
+        document.getElementById("email").value.trim();
+
+    const password =
+        document.getElementById("password").value;
+
+
+loginButton.disabled = true;
+
+loginButton.textContent = "Logging in...";
+
+loginButton.classList.add("login-processing");
+
+loginMessage.textContent = "";
+
+
+    try {
+
+        // LOGIN THROUGH FIREBASE
+        const result = await loginUserAccount(
+            email,
+            password
+        );
+
+
+        // DISPLAY LOGIN SUCCESS MESSAGE
+        loginMessage.className = "message-success";
+
+        loginMessage.textContent =
+            result.message + " Role: " + result.role;
+
+
+        // REDIRECT TO HOMEPAGE AFTER 1.5 SECONDS
+        setTimeout(function () {
+
+            window.location.href = "index.html";
+
+        }, 1500);
+
+
+    } catch (error) {
+
+        console.error("Login Error:", error);
+
+        loginMessage.className = "message-error";
+
+        loginMessage.textContent =
+            error.message ||
+            error.error?.message ||
+            "Login failed. Please check your details.";
+
+loginButton.disabled = true;
+loginButton.style.backgroundColor = "#493B59";
+loginButton.style.color = "white";
+loginButton.textContent = "Logging in...";
+    }
+
+});
+
+    </script>
+
+</body>
+
+</html>
