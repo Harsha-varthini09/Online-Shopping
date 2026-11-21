@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Customers | Elegance Admin</title>
+
+    <script>
+        if (!sessionStorage.getItem("firebaseIdToken")) {
+            window.location.replace("login.html");
+        } else if (sessionStorage.getItem("userRole") !== "admin") {
+            window.location.replace("index.html");
+        }
+    </script>
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <a href="admin.html" class="logo">Elegance. <span class="admin-tag">Admin</span></a>
+        <ul class="nav-links">
+            <li><a href="admin.html">Dashboard</a></li>
+            <li><a href="admin-products.html">Inventory</a></li>
+            <li><a href="admin-categories.html">Categories</a></li>
+            <li><a href="admin-customers.html">Customers</a></li>
+            <li><a href="admin-orders.html">Orders</a></li>
+            <li><a href="admin-reports.html">Reports</a></li>
+            <li><a href="index.html">Store</a></li>
+            <li><a href="login.html" id="auth-link">Logout</a></li>
+        </ul>
+    </nav>
+
+    <section class="admin-banner">
+        <h1>Customers</h1>
+        <p>Manage customer details and credit limits.</p>
+    </section>
+
+    <section class="admin-section">
+        <div class="container">
+
+            <div class="stats-grid">
+                <div class="stat-card"><span>Customers</span><strong id="stat-count">0</strong></div>
+                <div class="stat-card"><span>Total Credit Given</span><strong id="stat-limit">₹0</strong></div>
+                <div class="stat-card"><span>Credit Outstanding</span><strong id="stat-used">₹0</strong></div>
+            </div>
+
+            <div class="panel">
+
+                <div class="panel-head">
+                    <h3>All Customers</h3>
+                    <button type="button" class="btn" id="add-customer-btn">+ Add Customer</button>
+                </div>
+
+                <div class="toolbar">
+                    <div class="field grow">
+                        <label for="customer-search">Search</label>
+                        <input type="search" id="customer-search" class="form-control" placeholder="Search by name, email, mobile or ID">
+                    </div>
+                    <div class="field">
+                        <label for="credit-filter">Credit</label>
+                        <select id="credit-filter" class="form-control">
+                            <option value="">All customers</option>
+                            <option value="owing">Has outstanding credit</option>
+                            <option value="maxed">Credit fully used</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="customers-table"><p class="empty-row">Loading...</p></div>
+
+                <div class="pagination">
+                    <span id="page-info"></span>
+                    <div class="pager">
+                        <button type="button" class="btn btn-outline btn-sm" id="prev-page">← Previous</button>
+                        <button type="button" class="btn btn-outline btn-sm" id="next-page">Next →</button>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+
+    <!-- ADD CUSTOMER -->
+
+    <div class="modal-backdrop" id="add-modal">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-title">
+
+            <h3 id="add-title">Add Customer</h3>
+
+            <form id="add-form" novalidate>
+
+                <div class="form-grid">
+
+                    <div class="form-group full">
+                        <label for="a-name">Full Name</label>
+                        <input type="text" id="a-name" class="form-control" maxlength="60" required>
+                    </div>
+
+                    <div class="form-group full">
+                        <label for="a-email">Email</label>
+                        <input type="email" id="a-email" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="a-mob">Mobile</label>
+                        <input type="tel" id="a-mob" class="form-control" maxlength="10" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="a-limit">Credit Limit (₹)</label>
+                        <input type="number" id="a-limit" class="form-control" min="0" step="1" required>
+                    </div>
+
+                    <div class="form-group full">
+                        <label for="a-password">Temporary Password</label>
+                        <input type="password" id="a-password" class="form-control" minlength="6" required>
+                        <p class="field-hint">The customer can change it with “Forgot Password”.</p>
+                    </div>
+
+                </div>
+
+                <p class="form-error" id="add-error"></p>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" data-close="add-modal">Cancel</button>
+                    <button type="submit" class="btn" id="add-save">Create Customer</button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+
+    <!-- EDIT CUSTOMER -->
+
+    <div class="modal-backdrop" id="edit-modal">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+
+            <h3 id="edit-title">Edit Customer</h3>
+
+            <form id="edit-form" novalidate>
+
+                <div class="form-grid">
+
+                    <div class="form-group full">
+                        <label for="e-id">Customer ID</label>
+                        <input type="text" id="e-id" class="form-control" readonly>
+                    </div>
+
+                    <div class="form-group full">
+                        <label for="e-email">Email</label>
+                        <input type="email" id="e-email" class="form-control" readonly>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="e-name">Full Name</label>
+                        <input type="text" id="e-name" class="form-control" maxlength="60" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="e-mob">Mobile</label>
+                        <input type="tel" id="e-mob" class="form-control" maxlength="10">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="e-limit">Credit Limit (₹)</label>
+                        <input type="number" id="e-limit" class="form-control" min="0" step="1" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="e-used">Credit Used (₹)</label>
+                        <input type="number" id="e-used" class="form-control" min="0" step="0.01" required>
+                    </div>
+
+                    <div class="form-group full">
+                        <label for="e-payment">Record Credit Payment (₹)</label>
+                        <div style="display:flex;gap:8px">
+                            <input type="number" id="e-payment" class="form-control" min="0" step="0.01" placeholder="Amount paid by customer">
+                            <button type="button" class="btn btn-outline btn-sm" id="apply-payment">Apply</button>
+                        </div>
+                        <p class="field-hint">Reduces “Credit Used” by the amount the customer has paid back.</p>
+                    </div>
+
+                </div>
+
+                <p class="form-error" id="edit-error"></p>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" data-close="edit-modal">Cancel</button>
+                    <button type="submit" class="btn" id="edit-save">Save Changes</button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+
+    <footer class="footer">
+        <p>© 2026 Elegance Store. All Rights Reserved.</p>
+    </footer>
+
+
+    <script src="../Backend/firebase-config.js"></script>
+    <script src="../Backend/firestore-api.js"></script>
+    <script src="../Backend/utility.js"></script>
+    <script src="../Backend/auth-api.js"></script>
+    <script src="../Backend/user-api.js"></script>
+    <script src="../Backend/payment-api.js"></script>
+    <script src="../Backend/customer-api.js"></script>
+    <script src="../Backend/mail-api.js"></script>
+    <script src="js/auth-navigation.js"></script>
+    <script src="js/admin-common.js"></script>
+    <script src="js/password-toggle.js"></script>
+
+    <script>
+    (function () {
+
+        const PAGE_SIZE = 10;
+
+        let customers = [];
+        let filtered = [];
+        let pageIndex = 0;
+
+        const tableBox = document.getElementById("customers-table");
+        const searchInput = document.getElementById("customer-search");
+        const creditFilter = document.getElementById("credit-filter");
+
+
+        // =============================================
+        // LOAD (USER ACCOUNTS + CUSTOMER PROFILES)
+        // =============================================
+
+        async function loadCustomers() {
+
+            try {
+
+                const results = await Promise.all([
+                    getAllUsers(),
+                    listAllDocuments("Customers")
+                ]);
+
+                const users = results[0];
+                const profiles = {};
+
+                documentsToObjects(results[1]).forEach(function (profile) {
+                    profiles[profile._docId] = profile;
+                });
+
+                const list = [];
+                const seen = {};
+
+                // EVERY NON-ADMIN ACCOUNT IS A CUSTOMER
+
+                users.forEach(function (user) {
+
+                    if (user.role === "admin") return;
+
+                    // DELETED (DISABLED) CUSTOMERS ARE HIDDEN
+                    if (user.disabled === true) {
+                        seen[user.uid] = true;
+                        return;
+                    }
+
+                    const profile = profiles[user.uid];
+
+                    seen[user.uid] = true;
+
+                    list.push(buildCustomer(user.uid, profile, user));
+                });
+
+                // PROFILES WITHOUT A USER RECORD
+
+                Object.keys(profiles).forEach(function (id) {
+                    if (!seen[id]) list.push(buildCustomer(id, profiles[id], null));
+                });
+
+                customers = list.sort(function (a, b) {
+                    return a.name.localeCompare(b.name);
+                });
+
+                updateStats();
+                applyFilters();
+
+            } catch (error) {
+
+                console.error("Customers Error:", error);
+
+                tableBox.innerHTML = "";
+                const message = document.createElement("p");
+                message.className = "empty-row";
+                message.textContent = "Unable to load customers: " + getErrorMessage(error);
+                tableBox.appendChild(message);
+            }
+        }
+
+        function buildCustomer(id, profile, user) {
+
+            profile = profile || {};
+
+            return {
+                id: id,
+                hasProfile: Boolean(profile._docId),
+                name: profile.name || (user && user.email ? user.email.split("@")[0] : "-"),
+                email: profile.email || (user && user.email) || "",
+                mob: profile.mob || "",
+                credit_limit: Number(profile.credit_limit ?? DEFAULT_CREDIT_LIMIT),
+                credit_used: Number(profile.credit_used || 0),
+                created_at: profile.created_at || (user && user.created_at) || null
+            };
+        }
+
+        function updateStats() {
+
+            document.getElementById("stat-count").textContent = customers.length;
+
+            document.getElementById("stat-limit").textContent = formatMoney(
+                customers.reduce(function (sum, c) { return sum + c.credit_limit; }, 0)
+            );
+
+            document.getElementById("stat-used").textContent = formatMoney(
+                customers.reduce(function (sum, c) { return sum + c.credit_used; }, 0)
+            );
+        }
+
+
+        // =============================================
+        // FILTER + PAGINATE + RENDER
+        // =============================================
+
+        function applyFilters() {
+
+            const text = searchInput.value.toLowerCase().trim();
+            const credit = creditFilter.value;
+
+            filtered = customers.filter(function (c) {
+
+                if (credit === "owing" && c.credit_used <= 0) return false;
+                if (credit === "maxed" && c.credit_used < c.credit_limit) return false;
+
+                return !text || [c.id, c.name, c.email, c.mob].some(function (value) {
+                    return String(value).toLowerCase().includes(text);
+                });
+            });
+
+            pageIndex = 0;
+
+            render();
+        }
+
+        function render() {
+
+            const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+
+            pageIndex = Math.min(pageIndex, pages - 1);
+
+            const rows = filtered.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE);
+
+            renderDataTable(tableBox, [
+                { label: "ID", value: function (c) { return c.id; }, render: function (c) {
+                    const span = document.createElement("span");
+                    span.textContent = c.id.slice(0, 10) + (c.id.length > 10 ? "…" : "");
+                    span.title = c.id;
+                    return span;
+                } },
+                { label: "Name", value: function (c) { return c.name; } },
+                { label: "Email", value: function (c) { return c.email || "-"; } },
+                { label: "Mobile", value: function (c) { return c.mob || "-"; } },
+                { label: "Credit Limit", num: true, value: function (c) { return formatMoney(c.credit_limit); } },
+                { label: "Credit Used", num: true, value: function (c) { return formatMoney(c.credit_used); } },
+                {
+                    label: "Available", num: true,
+                    value: function (c) { return formatMoney(Math.max(0, c.credit_limit - c.credit_used)); },
+                    render: function (c) {
+                        const available = Math.max(0, c.credit_limit - c.credit_used);
+                        return available <= 0
+                            ? makeBadge(formatMoney(0), "danger")
+                            : formatMoney(available);
+                    }
+                },
+                {
+                    label: "Actions",
+                    value: function () { return ""; },
+                    render: function (c) {
+                        const box = document.createElement("div");
+                        box.className = "row-actions";
+                        box.appendChild(makeButton("Edit", "btn-outline", function () { openEdit(c); }));
+                        box.appendChild(makeButton("Delete", "btn-danger", function () { removeCustomer(c); }));
+                        return box;
+                    }
+                }
+            ], rows, { emptyText: customers.length ? "No matching customers." : "No customers yet." });
+
+            document.getElementById("page-info").textContent =
+                "Page " + (pageIndex + 1) + " of " + pages + " · " + filtered.length + " customers";
+
+            document.getElementById("prev-page").disabled = pageIndex === 0;
+            document.getElementById("next-page").disabled = pageIndex >= pages - 1;
+        }
+
+
+        // =============================================
+        // VALIDATION HELPERS
+        // =============================================
+
+        function validName(name) {
+            return /^[A-Za-z][A-Za-z .'-]{1,59}$/.test(name);
+        }
+
+        function validMobile(mob) {
+            return /^[6-9][0-9]{9}$/.test(mob);
+        }
+
+        function validEmail(email) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+        }
+
+
+        // =============================================
+        // CREATE CUSTOMER
+        // =============================================
+
+        function openAdd() {
+            document.getElementById("add-form").reset();
+            document.getElementById("a-limit").value = DEFAULT_CREDIT_LIMIT;
+            document.getElementById("add-error").textContent = "";
+            openModal("add-modal");
+        }
+
+        document.getElementById("add-form").addEventListener("submit", async function (event) {
+
+            event.preventDefault();
+
+            const errorBox = document.getElementById("add-error");
+
+            const name = document.getElementById("a-name").value.trim();
+            const email = document.getElementById("a-email").value.trim();
+            const mob = document.getElementById("a-mob").value.trim();
+            const limit = document.getElementById("a-limit").value;
+            const password = document.getElementById("a-password").value;
+
+            if (!validName(name)) { errorBox.textContent = "Enter a valid name (letters only, at least 2)."; return; }
+            if (!validEmail(email)) { errorBox.textContent = "Enter a valid email address."; return; }
+            if (!validMobile(mob)) { errorBox.textContent = "Mobile must be 10 digits starting with 6-9."; return; }
+            if (limit === "" || Number(limit) < 0) { errorBox.textContent = "Credit limit must be 0 or more."; return; }
+            if (password.length < 6) { errorBox.textContent = "Password must be at least 6 characters."; return; }
+
+            const button = document.getElementById("add-save");
+            button.disabled = true;
+            button.textContent = "Creating...";
+            errorBox.textContent = "";
+
+            try {
+
+                // NEW LOGIN ACCOUNT (DOES NOT CHANGE THE ADMIN'S SESSION)
+                const authResponse = await registerUser(email, password);
+
+                // ROLE RECORD, WRITTEN AS THE NEW USER
+                await createUserProfile(authResponse, "customer");
+
+                // CUSTOMER PROFILE, WRITTEN BY THE ADMIN
+                await createCustomerProfile({
+                    id: authResponse.localId,
+                    name: name,
+                    email: authResponse.email,
+                    mob: mob,
+                    credit_limit: Number(limit)
+                });
+
+                try {
+                    await sendWelcomeEmail(authResponse.email, name, authResponse.idToken);
+                } catch (mailError) {
+                    console.warn("Welcome email not queued:", mailError);
+                }
+
+                closeModal("add-modal");
+
+                showToast("Customer created.", "success");
+
+                loadCustomers();
+
+            } catch (error) {
+
+                console.error("Create Customer Error:", error);
+
+                errorBox.textContent = error.error && error.error.message && !error.status
+                    ? getFriendlyAuthError(error)
+                    : getErrorMessage(error);
+
+            } finally {
+
+                button.disabled = false;
+                button.textContent = "Create Customer";
+            }
+        });
+
+
+        // =============================================
+        // EDIT CUSTOMER / CREDIT LIMIT
+        // =============================================
+
+        let editing = null;
+
+        function openEdit(customer) {
+
+            editing = customer;
+
+            document.getElementById("e-id").value = customer.id;
+            document.getElementById("e-email").value = customer.email;
+            document.getElementById("e-name").value = customer.name === "-" ? "" : customer.name;
+            document.getElementById("e-mob").value = customer.mob;
+            document.getElementById("e-limit").value = customer.credit_limit;
+            document.getElementById("e-used").value = customer.credit_used;
+            document.getElementById("e-payment").value = "";
+            document.getElementById("edit-error").textContent = "";
+
+            openModal("edit-modal");
+        }
+
+        document.getElementById("apply-payment").addEventListener("click", function () {
+
+            const usedInput = document.getElementById("e-used");
+            const payment = Number(document.getElementById("e-payment").value);
+
+            if (!(payment > 0)) {
+                document.getElementById("edit-error").textContent = "Enter the amount paid.";
+                return;
+            }
+
+            usedInput.value = Math.max(0, Math.round((Number(usedInput.value) - payment) * 100) / 100);
+
+            document.getElementById("e-payment").value = "";
+            document.getElementById("edit-error").textContent = "";
+        });
+
+        document.getElementById("edit-form").addEventListener("submit", async function (event) {
+
+            event.preventDefault();
+
+            const errorBox = document.getElementById("edit-error");
+
+            const name = document.getElementById("e-name").value.trim();
+            const mob = document.getElementById("e-mob").value.trim();
+            const limit = document.getElementById("e-limit").value;
+            const used = document.getElementById("e-used").value;
+
+            if (!validName(name)) { errorBox.textContent = "Enter a valid name (letters only, at least 2)."; return; }
+            if (mob && !validMobile(mob)) { errorBox.textContent = "Mobile must be 10 digits starting with 6-9."; return; }
+            if (limit === "" || Number(limit) < 0) { errorBox.textContent = "Credit limit must be 0 or more."; return; }
+            if (used === "" || Number(used) < 0) { errorBox.textContent = "Credit used must be 0 or more."; return; }
+
+            const button = document.getElementById("edit-save");
+            button.disabled = true;
+            button.textContent = "Saving...";
+            errorBox.textContent = "";
+
+            const changes = {
+                name: name,
+                mob: mob,
+                credit_limit: Number(limit),
+                credit_used: Math.round(Number(used) * 100) / 100,
+                updated_at: new Date()
+            };
+
+            // OLDER ACCOUNTS: CREATE THE MISSING PROFILE FIELDS
+            if (!editing.hasProfile) {
+                changes.id = editing.id;
+                changes.email = editing.email;
+                changes.created_at = new Date();
+            }
+
+            try {
+
+                await updateCustomer(editing.id, changes);
+
+                closeModal("edit-modal");
+
+                showToast("Customer updated.", "success");
+
+                loadCustomers();
+
+            } catch (error) {
+
+                console.error("Update Customer Error:", error);
+
+                errorBox.textContent = getErrorMessage(error);
+
+            } finally {
+
+                button.disabled = false;
+                button.textContent = "Save Changes";
+            }
+        });
+
+
+        // =============================================
+        // DELETE (YES / NO)
+        // =============================================
+
+        async function removeCustomer(customer) {
+
+            const warning = customer.credit_used > 0
+                ? " They still owe " + formatMoney(customer.credit_used) + " in credit."
+                : "";
+
+            const yes = await confirmAction(
+                "Delete customer?",
+                "Delete “" + customer.name + "” (" + (customer.email || customer.id) + ")? " +
+                "Their profile is removed and they will no longer be able to sign in. " +
+                "Past orders are kept for reports." + warning
+            );
+
+            if (!yes) return;
+
+            try {
+
+                const token = sessionStorage.getItem("firebaseIdToken");
+
+                // DISABLE THE LOGIN (KEEPS THE RECORD SO THE ACCOUNT CANNOT
+                // RE-CREATE ITSELF) AND REMOVE THE CUSTOMER PROFILE
+                await sendFirestoreRequest(
+                    "users/" + encodeURIComponent(customer.id) +
+                        "?updateMask.fieldPaths=disabled&updateMask.fieldPaths=disabled_at",
+                    "PATCH",
+                    { fields: convertToFirestoreFields({ disabled: true, disabled_at: new Date() }) },
+                    token
+                );
+
+                await deleteCustomer(customer.id).catch(function (error) {
+                    if (error.status !== 404) throw error;
+                });
+
+                showToast("Customer deleted.", "success");
+
+                loadCustomers();
+
+            } catch (error) {
+
+                console.error("Delete Customer Error:", error);
+
+                showToast(getErrorMessage(error), "error");
+            }
+        }
+
+
+        // EVENTS
+
+        searchInput.addEventListener("input", applyFilters);
+        creditFilter.addEventListener("change", applyFilters);
+
+        document.getElementById("prev-page").addEventListener("click", function () {
+            pageIndex--; render();
+        });
+
+        document.getElementById("next-page").addEventListener("click", function () {
+            pageIndex++; render();
+        });
+
+        document.getElementById("add-customer-btn").addEventListener("click", openAdd);
+
+        document.querySelectorAll("[data-close]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                closeModal(button.dataset.close);
+            });
+        });
+
+        loadCustomers();
+
+    })();
+    </script>
+
+</body>
+
+</html>

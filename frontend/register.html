@@ -204,7 +204,7 @@
                         type="password"
                         id="password"
                         class="form-control"
-                        placeholder="Create a password"
+                        placeholder="At least 6 characters, with a letter and a number"
                         minlength="6"
                         required
                     >
@@ -285,7 +285,16 @@
 
     <script src="../Backend/user-api.js"></script>
 
+    <script src="../Backend/payment-api.js"></script>
+
+    <script src="../Backend/customer-api.js"></script>
+
+    <script src="../Backend/mail-api.js"></script>
+
     <script src="../Backend/auth-service.js"></script>
+
+    <script src="js/password-toggle.js"></script>
+
 
 
     <!-- REGISTRATION JAVASCRIPT -->
@@ -323,16 +332,33 @@
                 document.getElementById("confirm-password").value;
 
 
+            // VALIDATIONS
+
+            function fail(text) {
+                registerMessage.className = "message-error";
+                registerMessage.textContent = text;
+            }
+
+            if (!/^[A-Za-z][A-Za-z .'-]{1,59}$/.test(name)) {
+                return fail("Please enter a valid full name (letters only, at least 2 characters).");
+            }
+
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+                return fail("Please enter a valid email address.");
+            }
+
+            if (!/^[6-9][0-9]{9}$/.test(mobile)) {
+                return fail("Mobile number must be 10 digits and start with 6, 7, 8 or 9.");
+            }
+
+            if (password.length < 6 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+                return fail("Password must be at least 6 characters and include a letter and a number.");
+            }
+
             // CHECK PASSWORD MATCH
 
             if (password !== confirmPassword) {
-
-                registerMessage.className = "message-error";
-
-                registerMessage.textContent =
-                    "Passwords do not match.";
-
-                return;
+                return fail("Passwords do not match.");
             }
 
 
@@ -349,17 +375,24 @@
 
                 const result = await registerCustomer(
                     email,
-                    password
+                    password,
+                    name,
+                    mobile
                 );
 
 
                 registerMessage.className = "message-success";
 
                 registerMessage.textContent =
-                    result.message;
+                    result.message + " You have ₹" + DEFAULT_CREDIT_LIMIT +
+                    " store credit. Redirecting to login...";
 
 
                 registerForm.reset();
+
+                setTimeout(function () {
+                    window.location.href = "login.html";
+                }, 2000);
 
 
             } catch (error) {
@@ -368,10 +401,17 @@
 
                 registerMessage.className = "message-error";
 
+                if (error.status === 403) {
+                    console.error(
+                        "[Store setup] Firestore denied creating users/{uid}. " +
+                        "Publish firestore.rules in the Firebase console.", error.error
+                    );
+                }
+
                 registerMessage.textContent =
-                    error.message ||
-                    error.error?.message ||
-                    "Registration failed. Please try again.";
+                    error.status
+                        ? "Sign up could not be completed (the store's database refused it). Nothing was saved - please try again later."
+                        : getFriendlyAuthError(error);
 
             }
 

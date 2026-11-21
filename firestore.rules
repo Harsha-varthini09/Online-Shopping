@@ -1,0 +1,112 @@
+// =============================================================
+// ELEGANCE STORE - FIRESTORE SECURITY RULES
+// =============================================================
+// Deploy: Firebase Console -> Firestore Database -> Rules -> paste -> Publish
+//
+// The admin is the single account whose users/{uid} document has
+// role == "admin" (set it once in the Firebase console).
+// Everyone else signs up as a customer.
+// =============================================================
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function onlyChanges(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // LOGIN ACCOUNTS + ROLE
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      // customers can only ever create themselves as "customer"
+      allow create: if isAdmin() ||
+        (isSelf(uid) &&
+         request.resource.data.uid == uid &&
+         request.resource.data.role == "customer");
+      allow update, delete: if isAdmin();
+    }
+
+    // CUSTOMER PROFILES (name, email, mob, credit_limit, credit_used)
+    match /Customers/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+
+      // self-created profiles always start with the default credit (1000) and nothing used
+      allow create: if isAdmin() ||
+        (isSelf(uid) &&
+         request.resource.data.credit_limit == 1000 &&
+         request.resource.data.credit_used == 0);
+
+      // a customer can only ADD to their used credit, never past the limit
+      // (get/float also handle older records with missing or text values)
+      allow update: if isAdmin() ||
+        (isSelf(uid) &&
+         onlyChanges(["credit_used"]) &&
+         request.resource.data.credit_used is number &&
+         request.resource.data.credit_used > float(resource.data.get("credit_used", 0)) &&
+         request.resource.data.credit_used <= float(resource.data.get("credit_limit", 1000)));
+
+      allow delete: if isAdmin();
+    }
+
+    // CATEGORIES
+    match /categories/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // PRODUCTS
+    match /products/{id} {
+      allow read: if signedIn();
+      allow create, delete: if isAdmin();
+
+      // customers may only REDUCE stock (when an order is placed), never below 0
+      // int() also accepts stock that was saved as text, e.g. "10"
+      allow update: if isAdmin() ||
+        (signedIn() &&
+         onlyChanges(["qty"]) &&
+         request.resource.data.qty is int &&
+         request.resource.data.qty >= 0 &&
+         request.resource.data.qty < int(resource.data.qty));
+    }
+
+    // CARTS
+    match /carts/{uid} {
+      allow read, delete: if isAdmin() || isSelf(uid);
+      allow create, update: if isAdmin() ||
+        (isSelf(uid) && request.resource.data.user_id == request.auth.uid);
+    }
+
+    // ORDERS
+    match /orders/{orderId} {
+      allow read: if isAdmin() ||
+        (signedIn() && resource.data.user_id == request.auth.uid);
+      allow create: if signedIn() &&
+        request.resource.data.user_id == request.auth.uid &&
+        request.resource.data.payment_method in ["cash", "credit"];
+      allow update, delete: if isAdmin();
+    }
+
+    // OUTGOING EMAIL QUEUE (read by the "Trigger Email" extension)
+    match /mail/{id} {
+      // users may only queue mail to their own address
+      allow create: if isAdmin() ||
+        (signedIn() && request.resource.data.to == request.auth.token.email);
+      allow read, update, delete: if false;
+    }
+  }
+}

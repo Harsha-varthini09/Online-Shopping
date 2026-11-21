@@ -75,10 +75,62 @@
         }
 
         .payment-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
             background: #FFF9F2;
             padding: 15px;
-            border: 1px solid #F2C6D0;
+            border: 1px solid #EAE1ED;
             border-radius: 10px;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+
+        .payment-option:has(input:checked) {
+            border-color: #C77D91;
+            background: #FDF3F6;
+        }
+
+        .payment-option.disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .payment-option input {
+            margin-top: 5px;
+            accent-color: #C77D91;
+        }
+
+        .payment-option small {
+            display: block;
+            color: #8C8492;
+            font-size: 13px;
+        }
+
+        .credit-bar {
+            height: 6px;
+            background: #EAE1ED;
+            border-radius: 6px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .credit-bar span {
+            display: block;
+            height: 100%;
+            background: #C77D91;
+        }
+
+        .stock-warning {
+            display: block;
+            color: #a00000;
+            font-size: 13px;
+        }
+
+        .success-message a {
+            color: #17652a;
+            font-weight: bold;
+            text-decoration: underline;
         }
 
         .order-item {
@@ -147,6 +199,17 @@
 
 <body>
 
+    <nav class="navbar">
+        <a href="index.html" class="logo">Elegance.</a>
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="products.html">Products</a></li>
+            <li><a href="cart.html">Cart</a></li>
+            <li><a href="my-orders.html">My Orders</a></li>
+            <li><a href="login.html" id="auth-link">Login</a></li>
+        </ul>
+    </nav>
+
     <main class="checkout-container">
 
         <h1 class="checkout-title">Complete Your Order</h1>
@@ -204,15 +267,21 @@
 
                     <h2>Payment Method</h2>
 
-                    <div class="payment-option">
-                        <label>
-                            <input type="radio" name="payment-method"
-                                value="cash" checked disabled>
+                    <label class="payment-option">
+                        <input type="radio" name="payment-method" value="cash" checked>
+                        <span>
                             <strong>Cash on Delivery</strong>
-                        </label>
+                            <small>Pay with cash when your order is delivered.</small>
+                        </span>
+                    </label>
 
-                        <p>Pay with cash when your order is delivered.</p>
-                    </div>
+                    <label class="payment-option" id="credit-option">
+                        <input type="radio" name="payment-method" value="credit" id="credit-radio">
+                        <span>
+                            <strong>Store Credit</strong>
+                            <small id="credit-info">Checking your credit limit...</small>
+                        </span>
+                    </label>
 
                 </div>
 
@@ -253,35 +322,58 @@
     <script src="../Backend/firebase-config.js"></script>
     <script src="../Backend/firestore-api.js"></script>
     <script src="../Backend/utility.js"></script>
+    <script src="../Backend/product-api.js"></script>
     <script src="../Backend/cart-api.js"></script>
-    <script src="../Backend/order-api.js"></script>
     <script src="../Backend/payment-api.js"></script>
+    <script src="../Backend/customer-api.js"></script>
+    <script src="../Backend/mail-api.js"></script>
+    <script src="../Backend/order-api.js"></script>
 
     <script>
 
         let currentCartItems = [];
         let currentTotal = 0;
+        let availableCredit = 0;
+        let stockProblem = false;
 
         const userId = sessionStorage.getItem("firebaseUserId");
         const token = sessionStorage.getItem("firebaseIdToken");
+        const userEmail = sessionStorage.getItem("firebaseEmail") || "";
 
         // CHECK LOGIN
         if (!userId || !token) {
             window.location.replace("login.html");
         }
 
+        const placeButton = document.getElementById("place-order-btn");
+        const creditRadio = document.getElementById("credit-radio");
+        const creditInfo = document.getElementById("credit-info");
+
         // DISPLAY MESSAGE
-        function showMessage(message, type) {
+        function showMessage(message, type, link) {
 
             const messageBox =
                 document.getElementById("checkout-message");
 
             messageBox.textContent = message;
+
+            if (link) {
+                messageBox.appendChild(document.createTextNode(" "));
+                const anchor = document.createElement("a");
+                anchor.href = link.href;
+                anchor.textContent = link.text;
+                messageBox.appendChild(anchor);
+            }
+
             messageBox.className = "message " + type;
             messageBox.style.display = "block";
         }
 
-        // LOAD CART ITEMS
+        function money(value) {
+            return "₹" + Number(value || 0).toFixed(2);
+        }
+
+        // LOAD CART ITEMS (WITH LATEST PRICE AND STOCK)
         async function loadCheckoutItems() {
 
             try {
@@ -294,15 +386,34 @@
                 currentCartItems = cartData.items || [];
 
                 if (currentCartItems.length === 0) {
-
-                    document.getElementById("order-items").textContent =
-                        "Your cart is empty.";
-
-                    document.getElementById("place-order-btn").disabled =
-                        true;
-
+                    showEmptyCart();
                     return;
                 }
+
+                const productDocuments = await Promise.all(
+                    currentCartItems.map(function (item) {
+                        return getProductById(item.product_id).catch(function () {
+                            return null;
+                        });
+                    })
+                );
+
+                currentCartItems.forEach(function (item, index) {
+
+                    const document = productDocuments[index];
+                    const product = document ? convertFromFirestoreDocument(document) : null;
+
+                    item.problem = "";
+
+                    if (!product || product.status !== "active") {
+                        item.problem = "No longer available - please remove it from your cart.";
+                    } else {
+                        item.price = Number(product.price);
+                        if (Number(product.qty || 0) < Number(item.quantity)) {
+                            item.problem = "Only " + Number(product.qty || 0) + " left in stock - please update your cart.";
+                        }
+                    }
+                });
 
                 displayCheckoutItems();
 
@@ -310,12 +421,30 @@
 
                 console.error("Checkout Cart Error:", error);
 
+                if (error.status === 404) {
+                    showEmptyCart();
+                    return;
+                }
+
                 document.getElementById("order-items").textContent =
                     "Unable to load your cart.";
 
-                document.getElementById("place-order-btn").disabled =
-                    true;
+                placeButton.disabled = true;
             }
+        }
+
+        function showEmptyCart() {
+
+            const box = document.getElementById("order-items");
+
+            box.textContent = "Your cart is empty. ";
+
+            const link = document.createElement("a");
+            link.href = "products.html";
+            link.textContent = "Continue shopping";
+            box.appendChild(link);
+
+            placeButton.disabled = true;
         }
 
         // DISPLAY ORDER SUMMARY
@@ -327,6 +456,7 @@
             container.innerHTML = "";
 
             currentTotal = 0;
+            stockProblem = false;
 
             currentCartItems.forEach(function (item) {
 
@@ -344,9 +474,16 @@
                 itemName.textContent =
                     item.title + " × " + quantity;
 
+                if (item.problem) {
+                    stockProblem = true;
+                    const warning = document.createElement("small");
+                    warning.className = "stock-warning";
+                    warning.textContent = item.problem;
+                    itemName.appendChild(warning);
+                }
+
                 const itemPrice = document.createElement("strong");
-                itemPrice.textContent =
-                    "₹" + subtotal.toFixed(2);
+                itemPrice.textContent = money(subtotal);
 
                 itemDiv.appendChild(itemName);
                 itemDiv.appendChild(itemPrice);
@@ -355,8 +492,126 @@
 
             });
 
+            currentTotal = Math.round(currentTotal * 100) / 100;
+
             document.getElementById("order-total").textContent =
-                "₹" + currentTotal.toFixed(2);
+                money(currentTotal);
+
+            const messageBox = document.getElementById("checkout-message");
+
+            if (stockProblem) {
+                showMessage("Some items need attention.", "error-message", { href: "cart.html", text: "Go to cart" });
+                messageBox.dataset.stock = "1";
+            } else if (messageBox.dataset.stock) {
+                // PROBLEM FIXED - CLEAR THE OLD WARNING
+                messageBox.style.display = "none";
+                delete messageBox.dataset.stock;
+            }
+
+            placeButton.disabled = stockProblem;
+
+            updateCreditOption();
+        }
+
+        // LOAD CUSTOMER PROFILE (PREFILL + CREDIT)
+        async function loadCustomerProfile() {
+
+            try {
+
+                const result = await getOrCreateCustomerProfile(userId, userEmail);
+
+                const profile = result.profile;
+
+                availableCredit = Math.max(0, Math.round((profile.credit_limit - profile.credit_used) * 100) / 100);
+
+                const nameInput = document.getElementById("customer-name");
+                const phoneInput = document.getElementById("customer-phone");
+
+                if (!nameInput.value && profile.name) nameInput.value = profile.name;
+                if (!phoneInput.value && profile.mob) phoneInput.value = profile.mob;
+
+                creditInfo.dataset.limit = profile.credit_limit;
+                creditInfo.dataset.used = profile.credit_used;
+
+            } catch (error) {
+
+                console.error("Customer Profile Error:", error);
+
+                availableCredit = 0;
+                creditInfo.dataset.error = "1";
+            }
+
+            updateCreditOption();
+        }
+
+        function updateCreditOption() {
+
+            const option = document.getElementById("credit-option");
+
+            if (creditInfo.dataset.error) {
+                creditRadio.disabled = true;
+                option.classList.add("disabled");
+                creditInfo.textContent = "Store credit is unavailable right now.";
+                return;
+            }
+
+            if (creditInfo.dataset.limit === undefined) {
+                return;
+            }
+
+            const limit = Number(creditInfo.dataset.limit);
+            const used = Number(creditInfo.dataset.used);
+
+            const enough = currentTotal > 0 && currentTotal <= availableCredit;
+
+            creditInfo.textContent =
+                "Available credit: " + money(availableCredit) +
+                " of " + money(limit) +
+                (enough || currentTotal === 0 ? "" : " - not enough for this order.");
+
+            let bar = option.querySelector(".credit-bar");
+
+            if (!bar) {
+                bar = document.createElement("div");
+                bar.className = "credit-bar";
+                bar.appendChild(document.createElement("span"));
+                creditInfo.after(bar);
+            }
+
+            bar.firstChild.style.width = (limit > 0 ? Math.min(100, used / limit * 100) : 100) + "%";
+
+            creditRadio.disabled = !enough;
+            option.classList.toggle("disabled", !enough);
+
+            if (!enough && creditRadio.checked) {
+                document.querySelector('input[name="payment-method"][value="cash"]').checked = true;
+            }
+        }
+
+        // FORM VALIDATION
+        function validateDelivery(details) {
+
+            if (!/^[A-Za-z][A-Za-z .'-]{1,59}$/.test(details.customer_name)) {
+                return "Please enter a valid full name (letters only).";
+            }
+
+            if (!/^[6-9][0-9]{9}$/.test(details.phone)) {
+                return "Phone number must be 10 digits and start with 6, 7, 8 or 9.";
+            }
+
+            if (details.shipping_address.length < 10) {
+                return "Please enter your complete delivery address (at least 10 characters).";
+            }
+
+            if (!/^[A-Za-z][A-Za-z .-]{1,49}$/.test(details.city)) {
+                return "Please enter a valid city name.";
+            }
+
+            if (!/^[1-9][0-9]{5}$/.test(details.pincode)) {
+                return "PIN code must be 6 digits and cannot start with 0.";
+            }
+
+            return "";
         }
 
         // PLACE ORDER
@@ -365,126 +620,114 @@
 
                 event.preventDefault();
 
-                const button =
-                    document.getElementById("place-order-btn");
-
                 if (currentCartItems.length === 0) {
-                    showMessage(
-                        "Your cart is empty.",
-                        "error-message"
-                    );
+                    showMessage("Your cart is empty.", "error-message");
                     return;
                 }
 
-                const customerName =
-                    document.getElementById("customer-name").value.trim();
-
-                const phone =
-                    document.getElementById("customer-phone").value.trim();
-
-                const address =
-                    document.getElementById("customer-address").value.trim();
-
-                const city =
-                    document.getElementById("customer-city").value.trim();
-
-                const pincode =
-                    document.getElementById("customer-pincode").value.trim();
-
-                if (currentTotal <= 0) {
-                    showMessage(
-                        "Invalid order amount.",
-                        "error-message"
-                    );
+                if (stockProblem) {
+                    showMessage("Some items need attention.", "error-message", { href: "cart.html", text: "Go to cart" });
                     return;
                 }
 
-                button.disabled = true;
-                button.textContent = "Placing Order...";
+                const details = {
+                    customer_name: document.getElementById("customer-name").value.trim(),
+                    phone: document.getElementById("customer-phone").value.trim(),
+                    shipping_address: document.getElementById("customer-address").value.trim(),
+                    city: document.getElementById("customer-city").value.trim(),
+                    pincode: document.getElementById("customer-pincode").value.trim()
+                };
+
+                const problem = validateDelivery(details);
+
+                if (problem) {
+                    showMessage(problem, "error-message");
+                    return;
+                }
+
+                const paymentMethod =
+                    document.querySelector('input[name="payment-method"]:checked').value;
+
+                placeButton.disabled = true;
+                placeButton.textContent = "Placing Order...";
 
                 try {
 
-                    // PREPARE CASH PAYMENT
-                    const paymentDetails =
-                        preparePaymentDetails(currentTotal, "cash");
-
-                    // GENERATE ORDER ID
-                    const orderId =
-                        "ORD" + Date.now();
-
-                    // CREATE ORDER DATA
-                    const orderData = {
-
-                        order_id: orderId,
-
-                        user_id: userId,
-
-                        customer_name: customerName,
-
-                        phone: phone,
-
-                        shipping_address: address,
-
-                        city: city,
-
-                        pincode: pincode,
-
-                        items: currentCartItems,
-
-                        total_amount: currentTotal,
-
-                        payment_method: paymentDetails.payment_method,
-
-                        payment_status: paymentDetails.payment_status,
-
-                        order_status: "pending",
-
-                        created_at: new Date()
-
-                    };
-
-                    // SAVE ORDER TO FIREBASE
-                    await createOrder(orderData);
-
-                    // CLEAR CART AFTER SUCCESSFUL ORDER
-                    await saveCart(userId, []);
+                    const order = await placeOrder(
+                        userId,
+                        userEmail,
+                        currentCartItems,
+                        details,
+                        paymentMethod
+                    );
 
                     showMessage(
-                        "Order placed successfully! Your Order ID is " +
-                        orderId,
-                        "success-message"
+                        "Order placed successfully! Your Order ID is " + order.order_id +
+                        ". A confirmation email is on its way.",
+                        "success-message",
+                        { href: "bill.html?id=" + encodeURIComponent(order.order_id), text: "View / print your bill" }
                     );
+
+                    currentCartItems = [];
 
                     document.getElementById("order-items").textContent =
                         "Your order has been placed successfully.";
 
                     document.getElementById("order-total").textContent =
-                        "₹0.00";
+                        money(order.total_amount);
 
                     document.getElementById("checkout-form").reset();
 
-                    button.textContent = "Order Placed";
+                    placeButton.textContent = "Order Placed";
+
+                    if (paymentMethod === "credit") {
+                        loadCustomerProfile();
+                    }
 
                 } catch (error) {
 
                     console.error("Place Order Error:", error);
 
-                    showMessage(
-                        "Unable to place your order. Please check the console for details.",
-                        "error-message"
-                    );
+                    let message = error.message || "";
 
-                    button.disabled = false;
-                    button.textContent = "Place Order";
+                    if (error.status === 403) {
+                        console.error(
+                            "[Store setup] Firestore rejected the order (PERMISSION_DENIED). " +
+                            "Placing an order updates orders, products (stock), carts and Customers (credit). " +
+                            "Publish the rules in firestore.rules: Firebase Console -> Firestore Database -> Rules -> Publish.",
+                            error.error
+                        );
+                        message = "Your order could not be saved (permission denied).";
 
+                        if (error.diagnosis && error.diagnosis.length) {
+                            console.error("[Store setup] Diagnosis:\n- " + error.diagnosis.join("\n- "));
+                            message += " Reason: " + error.diagnosis.join(" ");
+                        } else {
+                            message += " Please contact the store.";
+                        }
+                    } else if (error.status) {
+                        message = "Unable to place your order. Please try again.";
+                    }
+
+                    showMessage(message || "Unable to place your order. Please try again.", "error-message");
+
+                    placeButton.disabled = false;
+                    placeButton.textContent = "Place Order";
+
+                    // REFRESH PRICES / STOCK / CREDIT
+                    loadCheckoutItems();
+                    loadCustomerProfile();
                 }
 
             });
 
         // START CHECKOUT
         loadCheckoutItems();
+        loadCustomerProfile();
 
     </script>
+
+    <script src="js/auth-navigation.js"></script>
 
 </body>
 </html>

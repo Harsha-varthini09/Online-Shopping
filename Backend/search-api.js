@@ -23,7 +23,7 @@ async function searchAllProducts() {
     };
 
     return sendFirestoreRequest(
-        "products:runQuery",
+        ":runQuery",
         "POST",
         query,
         sessionStorage.getItem("firebaseIdToken")
@@ -50,7 +50,7 @@ async function searchProductsByCategory(categoryId) {
     };
 
     return sendFirestoreRequest(
-        "products:runQuery",
+        ":runQuery",
         "POST",
         query,
         sessionStorage.getItem("firebaseIdToken")
@@ -77,7 +77,7 @@ async function searchProductByName(productName) {
     };
 
     return sendFirestoreRequest(
-        "products:runQuery",
+        ":runQuery",
         "POST",
         query,
         sessionStorage.getItem("firebaseIdToken")

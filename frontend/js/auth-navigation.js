@@ -69,3 +69,40 @@ if (authLink) {
     });
 
 }
+
+
+// ADMIN: ADD "ADMIN" LINK TO THE NAVIGATION
+
+(function () {
+
+    if (!loggedIn || sessionStorage.getItem("userRole") !== "admin") {
+        return;
+    }
+
+    const navLinks = document.querySelector(".nav-links");
+
+    if (!navLinks || navLinks.querySelector('a[href="admin.html"]')) {
+        return;
+    }
+
+    const item = document.createElement("li");
+
+    const link = document.createElement("a");
+
+    link.href = "admin.html";
+
+    link.textContent = "Admin";
+
+    item.appendChild(link);
+
+    // PLACE IT BEFORE LOGIN / LOGOUT WHEN POSSIBLE
+
+    const authItem = authLink ? authLink.closest("li") : null;
+
+    if (authItem && authItem.parentElement === navLinks) {
+        navLinks.insertBefore(item, authItem);
+    } else {
+        navLinks.appendChild(item);
+    }
+
+})();

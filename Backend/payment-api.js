@@ -4,6 +4,11 @@
  // =====================================
 
 
+// CREDIT LIMIT GIVEN TO EVERY NEW CUSTOMER (AS DISCUSSED: ₹1000)
+// If you change this, also change it in firestore.rules
+const DEFAULT_CREDIT_LIMIT = 1000;
+
+
 // VALIDATE PAYMENT METHOD
 function validatePaymentMethod(paymentMethod) {
 
@@ -44,7 +49,7 @@ function preparePaymentDetails(totalAmount, paymentMethod, creditLimit = 0) {
 
     return {
         payment_method: paymentMethod,
-        payment_status: "pending",
+        payment_status: paymentMethod === "credit" ? "on credit" : "pending",
         total_amount: totalAmount
     };
 }

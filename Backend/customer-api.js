@@ -73,3 +73,66 @@ async function deleteCustomer(customerId) {
         sessionStorage.getItem("firebaseIdToken")
     );
 }
+
+
+// CREATE CUSTOMER PROFILE (ID = FIREBASE USER ID)
+// idToken lets this run during sign up, before the session is saved
+async function createCustomerProfile(customerData, idToken) {
+
+    const profile = {
+        id: customerData.id,
+        name: customerData.name || "",
+        email: customerData.email || "",
+        mob: customerData.mob || "",
+        credit_limit: customerData.credit_limit ?? DEFAULT_CREDIT_LIMIT,
+        credit_used: 0,
+        created_at: new Date()
+    };
+
+    return sendFirestoreRequest(
+        `Customers?documentId=${encodeURIComponent(profile.id)}`,
+        "POST",
+        { fields: convertToFirestoreFields(profile) },
+        idToken || sessionStorage.getItem("firebaseIdToken")
+    );
+}
+
+
+// GET THE LOGGED-IN CUSTOMER'S PROFILE, CREATING IT IF MISSING
+// Returns { profile, updateTime }
+async function getOrCreateCustomerProfile(userId, email) {
+
+    let document;
+
+    try {
+
+        document = await getCustomerById(userId);
+
+    } catch (error) {
+
+        if (error.status !== 404) {
+            throw error;
+        }
+
+        // OLDER ACCOUNTS HAVE NO PROFILE YET
+
+        document = await createCustomerProfile({
+            id: userId,
+            name: (email || "").split("@")[0],
+            email: email || ""
+        });
+    }
+
+    const profile = convertFromFirestoreDocument(document);
+
+    profile.id = profile.id || getDocumentId(document);
+
+    profile.credit_limit = Number(profile.credit_limit ?? DEFAULT_CREDIT_LIMIT);
+
+    profile.credit_used = Number(profile.credit_used || 0);
+
+    return {
+        profile: profile,
+        updateTime: document.updateTime
+    };
+}

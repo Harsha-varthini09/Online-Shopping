@@ -50,6 +50,26 @@
             flex: 1;
         }
 
+        .cart-thumb {
+            width: 90px;
+            height: 90px;
+            object-fit: cover;
+            border-radius: 10px;
+            background: #EDE5F7;
+            flex-shrink: 0;
+        }
+
+        .stock-note {
+            color: #a00000;
+            font-size: 13px;
+            margin-top: 6px;
+        }
+
+        .quantity-controls button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
         .cart-item h3 {
             color: #493B59;
             margin: 0 0 8px;
@@ -162,9 +182,16 @@
 </head>
 
 <body>
-<nav>
-    <a href="my-orders.html">My Orders</a>
-</nav>
+    <nav class="navbar">
+        <a href="index.html" class="logo">Elegance.</a>
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="products.html">Products</a></li>
+            <li><a href="cart.html">Cart</a></li>
+            <li><a href="my-orders.html">My Orders</a></li>
+            <li><a href="login.html" id="auth-link">Login</a></li>
+        </ul>
+    </nav>
     <!-- CART SECTION -->
     <main class="cart-container">
 
@@ -219,6 +246,8 @@
     <script src="../Backend/firestore-api.js"></script>
     <script src="../Backend/utility.js"></script>
     <script src="../Backend/cart-api.js"></script>
+    <script src="../Backend/product-api.js"></script>
+    <script src="js/product-image.js"></script>
 
     <!-- CART JAVASCRIPT -->
     <script>
@@ -252,6 +281,8 @@
 
                 cartItems = cartData.items || [];
 
+                await loadStock();
+
                 displayCartItems();
 
             } catch (error) {
@@ -273,6 +304,32 @@
 
             }
 
+        }
+
+
+        // LATEST STOCK / STATUS FOR EACH CART ITEM
+        let stockInfo = {};
+
+        async function loadStock() {
+
+            const documents = await Promise.all(
+                cartItems.map(function (item) {
+                    return getProductById(item.product_id).catch(function () {
+                        return null;
+                    });
+                })
+            );
+
+            stockInfo = {};
+
+            cartItems.forEach(function (item, index) {
+
+                const product = documents[index]
+                    ? convertFromFirestoreDocument(documents[index])
+                    : null;
+
+                stockInfo[item.product_id] = product;
+            });
         }
 
 
@@ -331,6 +388,26 @@
 
                 itemDiv.className = "cart-item";
 
+                const product = stockInfo[item.product_id];
+
+                const stock = product ? Number(product.qty || 0) : 0;
+
+                const unavailable = !product || product.status !== "active";
+
+                const thumb = document.createElement("img");
+
+                thumb.className = "cart-thumb";
+
+                setProductImage(
+                    thumb,
+                    Object.assign({ id: item.product_id }, product || {}, { title: item.title }),
+                    ""
+                );
+
+                thumb.alt = item.title;
+
+                itemDiv.appendChild(thumb);
+
                 const details =
                     document.createElement("div");
 
@@ -383,6 +460,12 @@
                     updateQuantity(index, 1);
                 };
 
+                increaseButton.disabled = unavailable || quantity >= stock;
+
+                increaseButton.title = increaseButton.disabled
+                    ? "No more stock available"
+                    : "Add one more";
+
                 const removeButton =
                     document.createElement("button");
 
@@ -404,6 +487,19 @@
                 details.appendChild(subtotalText);
                 details.appendChild(controls);
 
+                if (unavailable || quantity > stock) {
+
+                    const note = document.createElement("p");
+
+                    note.className = "stock-note";
+
+                    note.textContent = unavailable
+                        ? "This product is no longer available. Please remove it."
+                        : "Only " + stock + " left in stock. Please reduce the quantity.";
+
+                    details.appendChild(note);
+                }
+
                 itemDiv.appendChild(details);
 
                 container.appendChild(itemDiv);
@@ -423,6 +519,16 @@
 
             const newQuantity =
                 cartItems[index].quantity + change;
+
+            const product = stockInfo[cartItems[index].product_id];
+
+            if (change > 0 && product && newQuantity > Number(product.qty || 0)) {
+
+                document.getElementById("cart-message").textContent =
+                    "Only " + Number(product.qty || 0) + " of this item in stock.";
+
+                return;
+            }
 
             if (newQuantity <= 0) {
 

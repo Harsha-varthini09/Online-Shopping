@@ -95,12 +95,46 @@
             text-align: center;
             padding: 20px;
         }
+
+        .order-date {
+            color: #8C8492;
+            font-size: 14px;
+        }
+
+        .bill-link {
+            display: inline-block;
+            margin-top: 12px;
+            color: #9279B8;
+            font-weight: bold;
+        }
+
+        .credit-summary {
+            background: white;
+            padding: 16px 22px;
+            border-radius: 14px;
+            margin-bottom: 22px;
+            box-shadow: 0 4px 15px rgba(73, 59, 89, 0.08);
+            color: #493B59;
+        }
     </style>
 </head>
 
 <body>
 
+    <nav class="navbar">
+        <a href="index.html" class="logo">Elegance.</a>
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="products.html">Products</a></li>
+            <li><a href="cart.html">Cart</a></li>
+            <li><a href="my-orders.html">My Orders</a></li>
+            <li><a href="login.html" id="auth-link">Login</a></li>
+        </ul>
+    </nav>
+
     <main class="orders-container">
+
+        <div class="credit-summary" id="credit-summary" hidden></div>
 
         <h1 class="orders-title">My Orders</h1>
 
@@ -115,6 +149,8 @@
     <script src="../Backend/firestore-api.js"></script>
     <script src="../Backend/utility.js"></script>
     <script src="../Backend/order-api.js"></script>
+    <script src="../Backend/payment-api.js"></script>
+    <script src="../Backend/customer-api.js"></script>
 
     <script>
 
@@ -213,7 +249,9 @@
 
             }
 
-            orders.reverse();
+            orders.sort(function (a, b) {
+                return (b.created_at || 0) - (a.created_at || 0);
+            });
 
             orders.forEach(function (order) {
 
@@ -273,8 +311,17 @@
                 );
 
                 addDetail(
+                    "Order Date",
+                    order.created_at instanceof Date
+                        ? order.created_at.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+                        : "-"
+                );
+
+                addDetail(
                     "Payment Method",
-                    "Cash on Delivery"
+                    String(order.payment_method).toLowerCase() === "credit"
+                        ? "Store Credit"
+                        : "Cash on Delivery"
                 );
 
                 addDetail(
@@ -327,6 +374,18 @@
 
                 details.appendChild(total);
 
+                const billLink =
+                    document.createElement("a");
+
+                billLink.className = "bill-link";
+
+                billLink.href =
+                    "bill.html?id=" + encodeURIComponent(order.order_id);
+
+                billLink.textContent = "View / Print Bill →";
+
+                details.appendChild(billLink);
+
                 card.appendChild(header);
                 card.appendChild(details);
 
@@ -337,8 +396,37 @@
         }
 
 
+        // SHOW STORE CREDIT
+        async function loadCreditSummary() {
+
+            try {
+
+                const result = await getOrCreateCustomerProfile(
+                    userId,
+                    sessionStorage.getItem("firebaseEmail")
+                );
+
+                const profile = result.profile;
+
+                const available = Math.max(0, profile.credit_limit - profile.credit_used);
+
+                const box = document.getElementById("credit-summary");
+
+                box.textContent =
+                    "Store credit: ₹" + available.toFixed(2) + " available of ₹" +
+                    profile.credit_limit.toFixed(2) + " (₹" + profile.credit_used.toFixed(2) + " used)";
+
+                box.hidden = false;
+
+            } catch (error) {
+                console.warn("Credit summary unavailable:", error);
+            }
+        }
+
+
         // START PAGE
         loadCustomerOrders();
+        loadCreditSummary();
 
     </script>
 

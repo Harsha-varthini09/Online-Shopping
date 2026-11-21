@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Categories | Elegance Admin</title>
+
+    <script>
+        if (!sessionStorage.getItem("firebaseIdToken")) {
+            window.location.replace("login.html");
+        } else if (sessionStorage.getItem("userRole") !== "admin") {
+            window.location.replace("index.html");
+        }
+    </script>
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <a href="admin.html" class="logo">Elegance. <span class="admin-tag">Admin</span></a>
+        <ul class="nav-links">
+            <li><a href="admin.html">Dashboard</a></li>
+            <li><a href="admin-products.html">Inventory</a></li>
+            <li><a href="admin-categories.html">Categories</a></li>
+            <li><a href="admin-customers.html">Customers</a></li>
+            <li><a href="admin-orders.html">Orders</a></li>
+            <li><a href="admin-reports.html">Reports</a></li>
+            <li><a href="index.html">Store</a></li>
+            <li><a href="login.html" id="auth-link">Logout</a></li>
+        </ul>
+    </nav>
+
+    <section class="admin-banner">
+        <h1>Categories</h1>
+        <p>Categories added here appear on the home page and in the product filters.</p>
+    </section>
+
+    <section class="admin-section">
+        <div class="container">
+
+            <div class="panel">
+
+                <div class="panel-head">
+                    <h3>All Categories</h3>
+                    <button type="button" class="btn" id="add-category-btn">+ Add Category</button>
+                </div>
+
+                <div class="toolbar">
+                    <div class="field grow">
+                        <label for="category-search">Search</label>
+                        <input type="search" id="category-search" class="form-control" placeholder="Search by ID or name">
+                    </div>
+                </div>
+
+                <div id="categories-table">
+                    <p class="empty-row">Loading...</p>
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+
+    <!-- ADD / EDIT MODAL -->
+
+    <div class="modal-backdrop" id="category-modal">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="category-modal-title">
+
+            <h3 id="category-modal-title">Add Category</h3>
+
+            <form id="category-form" novalidate>
+
+                <div class="form-group">
+                    <label for="c-name">Name</label>
+                    <input type="text" id="c-name" class="form-control" maxlength="60" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="c-id">Category ID</label>
+                    <input type="text" id="c-id" class="form-control" maxlength="40" required>
+                    <p class="field-hint" id="c-id-hint">Filled from the name. Letters, numbers, - and _ only. Cannot be changed later.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="c-desc">Description (optional)</label>
+                    <textarea id="c-desc" class="form-control" rows="2" maxlength="200"></textarea>
+                </div>
+
+                <p class="form-error" id="category-form-error"></p>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" id="category-cancel">Cancel</button>
+                    <button type="submit" class="btn" id="category-save">Save</button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+
+    <footer class="footer">
+        <p>© 2026 Elegance Store. All Rights Reserved.</p>
+    </footer>
+
+
+    <script src="../Backend/firebase-config.js"></script>
+    <script src="../Backend/firestore-api.js"></script>
+    <script src="../Backend/utility.js"></script>
+    <script src="../Backend/category-api.js"></script>
+    <script src="js/auth-navigation.js"></script>
+    <script src="js/admin-common.js"></script>
+
+    <script>
+    (function () {
+
+        let categories = [];
+        let productCounts = {};
+        let editingId = null;
+        let idTouched = false;
+
+        const tableBox = document.getElementById("categories-table");
+        const searchInput = document.getElementById("category-search");
+        const form = document.getElementById("category-form");
+        const formError = document.getElementById("category-form-error");
+        const nameInput = document.getElementById("c-name");
+        const idInput = document.getElementById("c-id");
+
+
+        // LOAD CATEGORIES + PRODUCT COUNTS
+
+        async function loadCategories() {
+
+            try {
+
+                const results = await Promise.all([
+                    listAllDocuments("categories"),
+                    listAllDocuments("products")
+                ]);
+
+                categories = documentsToObjects(results[0]);
+
+                productCounts = {};
+
+                documentsToObjects(results[1]).forEach(function (product) {
+                    productCounts[product.cat_id] = (productCounts[product.cat_id] || 0) + 1;
+                });
+
+                render();
+
+            } catch (error) {
+
+                console.error("Categories Error:", error);
+
+                tableBox.innerHTML = "";
+                const message = document.createElement("p");
+                message.className = "empty-row";
+                message.textContent = "Unable to load categories: " + getErrorMessage(error);
+                tableBox.appendChild(message);
+            }
+        }
+
+        function render() {
+
+            const text = searchInput.value.toLowerCase().trim();
+
+            const rows = categories.filter(function (category) {
+                return !text ||
+                    String(getCategoryId(category)).toLowerCase().includes(text) ||
+                    String(getCategoryLabel(category)).toLowerCase().includes(text);
+            }).sort(function (a, b) {
+                return String(getCategoryLabel(a)).localeCompare(String(getCategoryLabel(b)));
+            });
+
+            renderDataTable(tableBox, [
+                { label: "ID", value: function (c) { return c._docId; } },
+                { label: "Name", value: getCategoryLabel },
+                { label: "Description", value: function (c) { return c.description || "-"; } },
+                { label: "Products", num: true, value: function (c) { return productCounts[getCategoryId(c)] || 0; } },
+                {
+                    label: "Actions",
+                    value: function () { return ""; },
+                    render: function (c) {
+                        const box = document.createElement("div");
+                        box.className = "row-actions";
+                        box.appendChild(makeButton("Edit", "btn-outline", function () { openEditForm(c); }));
+                        box.appendChild(makeButton("Delete", "btn-danger", function () { removeCategory(c); }));
+                        return box;
+                    }
+                }
+            ], rows, { emptyText: categories.length ? "No matching categories." : "No categories yet. Click “Add Category”." });
+        }
+
+
+        // FORM
+
+        function slugify(text) {
+            return text.toLowerCase().trim()
+                .replace(/&/g, "and")
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "")
+                .slice(0, 40);
+        }
+
+        nameInput.addEventListener("input", function () {
+            if (!editingId && !idTouched) {
+                idInput.value = slugify(nameInput.value);
+            }
+        });
+
+        idInput.addEventListener("input", function () {
+            idTouched = true;
+        });
+
+        function openCreateForm() {
+
+            editingId = null;
+            idTouched = false;
+
+            form.reset();
+
+            document.getElementById("category-modal-title").textContent = "Add Category";
+            idInput.readOnly = false;
+            document.getElementById("c-id-hint").textContent =
+                "Filled from the name. Letters, numbers, - and _ only. Cannot be changed later.";
+
+            formError.textContent = "";
+
+            openModal("category-modal");
+        }
+
+        function openEditForm(category) {
+
+            editingId = category._docId;
+
+            document.getElementById("category-modal-title").textContent = "Edit Category";
+
+            nameInput.value = getCategoryLabel(category);
+            idInput.value = category._docId;
+            idInput.readOnly = true;
+            document.getElementById("c-id-hint").textContent = "Category ID cannot be changed.";
+            document.getElementById("c-desc").value = category.description || "";
+
+            formError.textContent = "";
+
+            openModal("category-modal");
+        }
+
+        form.addEventListener("submit", async function (event) {
+
+            event.preventDefault();
+
+            const name = nameInput.value.trim();
+            const id = idInput.value.trim();
+            const description = document.getElementById("c-desc").value.trim();
+
+            if (name.length < 2) {
+                formError.textContent = "Name must be at least 2 characters.";
+                return;
+            }
+
+            if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) {
+                formError.textContent = "Category ID can only use letters, numbers, - and _.";
+                return;
+            }
+
+            const duplicateName = categories.some(function (category) {
+                return category._docId !== editingId &&
+                    String(getCategoryLabel(category)).toLowerCase() === name.toLowerCase();
+            });
+
+            if (duplicateName) {
+                formError.textContent = "A category with this name already exists.";
+                return;
+            }
+
+            const saveButton = document.getElementById("category-save");
+            saveButton.disabled = true;
+            saveButton.textContent = "Saving...";
+            formError.textContent = "";
+
+            try {
+
+                if (editingId) {
+
+                    await updateCategory(editingId, {
+                        name: name,
+                        description: description
+                    });
+
+                    showToast("Category updated.", "success");
+
+                } else {
+
+                    await createCategory({
+                        id: id,
+                        name: name,
+                        description: description,
+                        created_at: new Date()
+                    });
+
+                    showToast("Category created.", "success");
+                }
+
+                closeModal("category-modal");
+
+                loadCategories();
+
+            } catch (error) {
+
+                console.error("Save Category Error:", error);
+
+                formError.textContent = error.status === 409
+                    ? "A category with this ID already exists."
+                    : getErrorMessage(error);
+
+            } finally {
+
+                saveButton.disabled = false;
+                saveButton.textContent = "Save";
+            }
+        });
+
+
+        // DELETE (ONLY WHEN EMPTY, WITH YES / NO)
+
+        async function removeCategory(category) {
+
+            const count = productCounts[getCategoryId(category)] || 0;
+
+            if (count > 0) {
+                showToast(
+                    "“" + getCategoryLabel(category) + "” still has " + count +
+                    " product(s). Move or delete them first.",
+                    "error"
+                );
+                return;
+            }
+
+            const yes = await confirmAction(
+                "Delete category?",
+                "Delete “" + getCategoryLabel(category) + "”? This cannot be undone."
+            );
+
+            if (!yes) return;
+
+            try {
+
+                await deleteCategory(category._docId);
+
+                showToast("Category deleted.", "success");
+
+                loadCategories();
+
+            } catch (error) {
+
+                console.error("Delete Category Error:", error);
+
+                showToast(getErrorMessage(error), "error");
+            }
+        }
+
+
+        // EVENTS
+
+        searchInput.addEventListener("input", render);
+
+        document.getElementById("add-category-btn").addEventListener("click", openCreateForm);
+
+        document.getElementById("category-cancel").addEventListener("click", function () {
+            closeModal("category-modal");
+        });
+
+        loadCategories();
+
+    })();
+    </script>
+
+</body>
+
+</html>

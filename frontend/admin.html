@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Admin Dashboard | Elegance</title>
+
+    <script>
+        if (!sessionStorage.getItem("firebaseIdToken")) {
+            window.location.replace("login.html");
+        } else if (sessionStorage.getItem("userRole") !== "admin") {
+            window.location.replace("index.html");
+        }
+    </script>
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+
+    <style>
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 22px;
+            margin-top: 25px;
+        }
+
+        @media (max-width: 850px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <a href="admin.html" class="logo">Elegance. <span class="admin-tag">Admin</span></a>
+        <ul class="nav-links">
+            <li><a href="admin.html">Dashboard</a></li>
+            <li><a href="admin-products.html">Inventory</a></li>
+            <li><a href="admin-categories.html">Categories</a></li>
+            <li><a href="admin-customers.html">Customers</a></li>
+            <li><a href="admin-orders.html">Orders</a></li>
+            <li><a href="admin-reports.html">Reports</a></li>
+            <li><a href="index.html">Store</a></li>
+            <li><a href="login.html" id="auth-link">Logout</a></li>
+        </ul>
+    </nav>
+
+    <section class="admin-banner">
+        <h1>Admin Dashboard</h1>
+        <p id="welcome-text">Overview of your store.</p>
+    </section>
+
+    <section class="admin-section">
+        <div class="container">
+
+            <div class="stats-grid">
+                <div class="stat-card"><span>Products</span><strong id="s-products">–</strong><small id="s-products-sub"></small></div>
+                <div class="stat-card"><span>Low Stock (&lt; 15)</span><strong id="s-low">–</strong><small>need restocking</small></div>
+                <div class="stat-card"><span>Customers</span><strong id="s-customers">–</strong><small id="s-credit"></small></div>
+                <div class="stat-card"><span>Orders</span><strong id="s-orders">–</strong><small id="s-pending"></small></div>
+                <div class="stat-card"><span>Sales This Month</span><strong id="s-month">–</strong><small id="s-month-sub"></small></div>
+            </div>
+
+            <div class="admin-links">
+                <a class="admin-link-card" href="admin-products.html"><div class="icon">📦</div><h3>Inventory</h3><p>Add, edit, activate or delete products.</p></a>
+                <a class="admin-link-card" href="admin-categories.html"><div class="icon">🗂️</div><h3>Categories</h3><p>Manage product categories.</p></a>
+                <a class="admin-link-card" href="admin-customers.html"><div class="icon">👥</div><h3>Customers</h3><p>Customer details and credit limits.</p></a>
+                <a class="admin-link-card" href="admin-orders.html"><div class="icon">🧾</div><h3>Orders</h3><p>Every order placed in the store.</p></a>
+                <a class="admin-link-card" href="admin-reports.html"><div class="icon">📊</div><h3>Reports</h3><p>Customer, inventory and sales reports.</p></a>
+            </div>
+
+            <div class="dashboard-grid">
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Recent Orders</h3>
+                        <a href="admin-orders.html" class="btn btn-outline btn-sm">View all</a>
+                    </div>
+                    <div id="recent-orders"><p class="empty-row">Loading...</p></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Low Stock</h3>
+                        <a href="admin-reports.html" class="btn btn-outline btn-sm">Reports</a>
+                    </div>
+                    <div id="low-stock"><p class="empty-row">Loading...</p></div>
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+    <footer class="footer">
+        <p>© 2026 Elegance Store. All Rights Reserved.</p>
+    </footer>
+
+
+    <script src="../Backend/firebase-config.js"></script>
+    <script src="../Backend/firestore-api.js"></script>
+    <script src="../Backend/utility.js"></script>
+    <script src="../Backend/payment-api.js"></script>
+    <script src="js/auth-navigation.js"></script>
+    <script src="js/admin-common.js"></script>
+
+    <script>
+    (async function () {
+
+        const email = sessionStorage.getItem("firebaseEmail");
+
+        if (email) {
+            document.getElementById("welcome-text").textContent = "Signed in as " + email;
+        }
+
+        try {
+
+            const results = await Promise.all([
+                listAllDocuments("products"),
+                listAllDocuments("orders"),
+                listAllDocuments("users"),
+                listAllDocuments("Customers")
+            ]);
+
+            const products = documentsToObjects(results[0]);
+            const orders = documentsToObjects(results[1]).map(normaliseOrder);
+            const users = documentsToObjects(results[2]);
+            const profiles = documentsToObjects(results[3]);
+
+            // PRODUCTS
+
+            const active = products.filter(function (p) { return p.status === "active"; }).length;
+            const low = products.filter(function (p) { return Number(p.qty || 0) < 15; })
+                .sort(function (a, b) { return Number(a.qty || 0) - Number(b.qty || 0); });
+
+            document.getElementById("s-products").textContent = products.length;
+            document.getElementById("s-products-sub").textContent = active + " active · " + (products.length - active) + " inactive";
+            document.getElementById("s-low").textContent = low.length;
+
+            // CUSTOMERS
+
+            const customerIds = new Set();
+            users.forEach(function (u) { if (u.role !== "admin" && u.disabled !== true) customerIds.add(u.uid || u._docId); });
+            profiles.forEach(function (c) { customerIds.add(c._docId); });
+
+            const outstanding = profiles.reduce(function (sum, c) { return sum + Number(c.credit_used || 0); }, 0);
+
+            document.getElementById("s-customers").textContent = customerIds.size;
+            document.getElementById("s-credit").textContent = formatMoney(outstanding) + " credit outstanding";
+
+            // ORDERS
+
+            const pending = orders.filter(function (o) { return o.order_status === "pending"; }).length;
+
+            document.getElementById("s-orders").textContent = orders.length;
+            document.getElementById("s-pending").textContent = pending + " pending";
+
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+            const monthOrders = orders.filter(function (o) {
+                return o.created_at instanceof Date && o.created_at >= monthStart && o.order_status !== "cancelled";
+            });
+
+            document.getElementById("s-month").textContent = formatMoney(
+                monthOrders.reduce(function (sum, o) { return sum + o.total_amount; }, 0)
+            );
+            document.getElementById("s-month-sub").textContent = monthOrders.length + " orders";
+
+            // RECENT ORDERS
+
+            const recent = orders.slice().sort(function (a, b) {
+                return (b.created_at || 0) - (a.created_at || 0);
+            }).slice(0, 6);
+
+            renderDataTable(document.getElementById("recent-orders"), [
+                { label: "Order", value: function (o) { return o.order_id; } },
+                { label: "Customer", value: function (o) { return o.customer_name || "-"; } },
+                { label: "Payment", value: function (o) { return o.payment_method === "credit" ? "Credit" : "Cash"; } },
+                { label: "Amount", num: true, value: function (o) { return formatMoney(o.total_amount); } }
+            ], recent, { emptyText: "No orders yet." });
+
+            // LOW STOCK
+
+            renderDataTable(document.getElementById("low-stock"), [
+                { label: "Product", value: function (p) { return p.title; } },
+                {
+                    label: "Qty", num: true,
+                    value: function (p) { return Number(p.qty || 0); },
+                    render: function (p) {
+                        const qty = Number(p.qty || 0);
+                        return makeBadge(String(qty), qty <= 0 ? "danger" : "warning");
+                    }
+                },
+                { label: "Price", num: true, value: function (p) { return formatMoney(p.price); } }
+            ], low.slice(0, 6), { emptyText: "All products are well stocked." });
+
+        } catch (error) {
+
+            console.error("Dashboard Error:", error);
+
+            showToast("Unable to load dashboard: " + getErrorMessage(error), "error");
+
+            document.getElementById("recent-orders").textContent = "";
+            document.getElementById("low-stock").textContent = "";
+        }
+
+    })();
+    </script>
+
+</body>
+
+</html>

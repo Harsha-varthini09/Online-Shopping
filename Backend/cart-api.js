@@ -38,28 +38,47 @@ async function saveCart(userId, items) {
 }
 
 
-// ADD PRODUCT TO CART
-async function addToCart(userId, product) {
+// READ CART ITEMS FROM A FIRESTORE CART DOCUMENT
+// Firestore returns an EMPTY array as { arrayValue: {} } (no "values"),
+// e.g. after an order is placed or the cart is cleared - handle that safely.
+function readCartItems(cart) {
+
+    const values =
+        (cart && cart.fields && cart.fields.items &&
+         cart.fields.items.arrayValue &&
+         cart.fields.items.arrayValue.values) || [];
+
+    return values
+        .filter(item => item && item.mapValue && item.mapValue.fields)
+        .map(item => {
+            const fields = item.mapValue.fields;
+
+            const number = value => value
+                ? Number(value.integerValue ?? value.doubleValue ?? 0)
+                : 0;
+
+            return {
+                product_id: fields.product_id ? fields.product_id.stringValue : "",
+                title: fields.title ? fields.title.stringValue : "",
+                price: number(fields.price),
+                quantity: number(fields.quantity)
+            };
+        });
+}
+
+
+// ADD PRODUCT TO CART (WITH THE SELECTED QUANTITY)
+async function addToCart(userId, product, quantity = 1) {
+
+    quantity = Math.max(1, Math.floor(Number(quantity) || 1));
+
 
     let items = [];
 
     try {
         const cart = await getCart(userId);
 
-        if (cart && cart.fields && cart.fields.items) {
-            items = cart.fields.items.arrayValue.values.map(item => {
-                const fields = item.mapValue.fields;
-
-                return {
-                    product_id: fields.product_id.stringValue,
-                    title: fields.title.stringValue,
-                    price: Number(fields.price.integerValue ??
-                        fields.price.doubleValue),
-                    quantity: Number(fields.quantity.integerValue ??
-                        fields.quantity.doubleValue)
-                };
-            });
-        }
+        items = readCartItems(cart);
 
     } catch (error) {
         if (error.error?.status !== "NOT_FOUND") {
@@ -71,14 +90,30 @@ async function addToCart(userId, product) {
         item => item.product_id === product.id
     );
 
+    const alreadyInCart = existingItem ? existingItem.quantity : 0;
+
+    const stock = Number(product.qty ?? Infinity);
+
+    if (alreadyInCart + quantity > stock) {
+
+        const left = Math.max(0, stock - alreadyInCart);
+
+        throw new Error(
+            left > 0
+                ? `Only ${left} more can be added (stock: ${stock}, in cart: ${alreadyInCart}).`
+                : `You already have all ${stock} available in your cart.`
+        );
+    }
+
     if (existingItem) {
-        existingItem.quantity += 1;
+        existingItem.quantity += quantity;
+        existingItem.price = Number(product.price);
     } else {
         items.push({
             product_id: product.id,
             title: product.title,
             price: Number(product.price),
-            quantity: 1
+            quantity: quantity
         });
     }
 
@@ -91,19 +126,7 @@ async function removeFromCart(userId, productId) {
 
     const cart = await getCart(userId);
 
-    const items = cart.fields.items.arrayValue.values
-        .map(item => {
-            const fields = item.mapValue.fields;
-
-            return {
-                product_id: fields.product_id.stringValue,
-                title: fields.title.stringValue,
-                price: Number(fields.price.integerValue ??
-                    fields.price.doubleValue),
-                quantity: Number(fields.quantity.integerValue ??
-                    fields.quantity.doubleValue)
-            };
-        })
+    const items = readCartItems(cart)
         .filter(item => item.product_id !== productId);
 
     return saveCart(userId, items);

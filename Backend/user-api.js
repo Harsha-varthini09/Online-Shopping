@@ -87,3 +87,19 @@ function createUserProfile(authResponse, role = "customer") {
         authResponse.idToken
     );
 }
+
+
+// READ ALL USER ACCOUNTS (ADMIN)
+async function getAllUsers() {
+
+    const documents = await listAllDocuments("users");
+
+    return documents.map(function (document) {
+
+        const user = convertFromFirestoreDocument(document);
+
+        user.uid = user.uid || getDocumentId(document);
+
+        return user;
+    });
+}

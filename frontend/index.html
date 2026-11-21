@@ -76,6 +76,31 @@
             margin-bottom: 8px;
         }
 
+        a.category-card {
+            display: block;
+            transition: 0.3s;
+        }
+
+        a.category-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .category-count {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: var(--lavender-light);
+            color: var(--plum);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .category-loading {
+            grid-column: 1 / -1;
+        }
+
         /* PROMOTIONAL SECTION */
 
         .offer-section {
@@ -130,6 +155,9 @@
 
         <li>
             <a href="#categories">Categories</a>
+        </li>
+        <li>
+            <a href="cart.html">Cart</a>
         </li>
         <li>
             <a href="my-orders.html">My Orders</a>
@@ -192,41 +220,11 @@
 
             </div>
 
-            <div class="category-grid">
+            <div class="category-grid" id="category-grid">
 
-                <div class="category-card">
+                <div class="category-card category-loading">
 
-                    <div class="category-icon">👗</div>
-
-                    <h3>Fashion</h3>
-
-                    <p>
-                        Discover styles that express your personality.
-                    </p>
-
-                </div>
-
-                <div class="category-card">
-
-                    <div class="category-icon">⌚</div>
-
-                    <h3>Accessories</h3>
-
-                    <p>
-                        Complete your look with beautiful accessories.
-                    </p>
-
-                </div>
-
-                <div class="category-card">
-
-                    <div class="category-icon">🏠</div>
-
-                    <h3>Home & Living</h3>
-
-                    <p>
-                        Make your everyday spaces feel special.
-                    </p>
+                    <p>Loading categories...</p>
 
                 </div>
 
@@ -271,40 +269,178 @@
         </p>
 
     </footer>
- <script>
-    const authLink = document.getElementById("auth-link");
+<script src="../Backend/firebase-config.js"></script>
+<script src="../Backend/firestore-api.js"></script>
+<script src="../Backend/utility.js"></script>
+<script src="../Backend/category-api.js"></script>
+<script src="../Backend/product-api.js"></script>
+<script src="js/auth-navigation.js"></script>
 
-    function updateAuthLink() {
+<script>
+// =============================================
+// LOAD CATEGORIES ADDED IN FIRESTORE
+// =============================================
 
-        const token = sessionStorage.getItem("firebaseIdToken");
+(function () {
 
-        if (token) {
-            authLink.textContent = "Logout";
-            authLink.href = "#";
-        } else {
-            authLink.textContent = "Login";
-            authLink.href = "login.html";
+    const grid = document.getElementById("category-grid");
+
+    const CATEGORY_ICONS = [
+        { words: ["fashion", "cloth", "apparel", "wear", "dress"], icon: "👗" },
+        { words: ["shoe", "footwear", "sneaker"], icon: "👟" },
+        { words: ["accessor", "watch", "jewel"], icon: "⌚" },
+        { words: ["bag", "luggage"], icon: "👜" },
+        { words: ["electronic", "gadget", "mobile", "phone", "laptop", "computer"], icon: "💻" },
+        { words: ["audio", "music", "headphone"], icon: "🎧" },
+        { words: ["home", "living", "decor", "furniture"], icon: "🏠" },
+        { words: ["kitchen", "cook"], icon: "🍳" },
+        { words: ["beauty", "cosmetic", "skin", "perfume"], icon: "💄" },
+        { words: ["book", "station"], icon: "📚" },
+        { words: ["sport", "fitness", "gym"], icon: "🏋️" },
+        { words: ["toy", "kid", "baby"], icon: "🧸" },
+        { words: ["grocery", "food"], icon: "🛒" }
+    ];
+
+    function getCategoryIcon(name) {
+
+        const text = (name || "").toLowerCase();
+
+        const match = CATEGORY_ICONS.find(function (entry) {
+            return entry.words.some(function (word) {
+                return text.includes(word);
+            });
+        });
+
+        return match ? match.icon : "🛍️";
+    }
+
+    function showMessage(text) {
+
+        grid.innerHTML = "";
+
+        const card = document.createElement("div");
+
+        card.className = "category-card category-loading";
+
+        const paragraph = document.createElement("p");
+
+        paragraph.textContent = text;
+
+        card.appendChild(paragraph);
+
+        grid.appendChild(card);
+    }
+
+    async function loadHomeCategories() {
+
+        try {
+
+            const categoryResponse = await getCategories();
+
+            const categories = (categoryResponse.documents || [])
+                .map(function (document) {
+
+                    const category = convertFromFirestoreDocument(document);
+
+                    category.docId = document.name.split("/").pop();
+
+                    return category;
+                });
+
+            // PRODUCT COUNTS ARE OPTIONAL - IGNORE IF THEY FAIL
+
+            let products = [];
+
+            try {
+
+                const productResponse = await getProducts();
+
+                products = (productResponse.documents || [])
+                    .map(convertFromFirestoreDocument);
+
+            } catch (error) {
+
+                console.warn("Category product counts unavailable:", error);
+            }
+
+            if (categories.length === 0) {
+
+                showMessage("No categories have been added yet.");
+
+                return;
+            }
+
+            grid.innerHTML = "";
+
+            categories.forEach(function (category) {
+
+                const categoryId =
+                    category.categoryId || category.id || category.docId;
+
+                const name =
+                    category.categoryName || category.name || "Category";
+
+                const card = document.createElement("a");
+
+                card.className = "category-card";
+
+                card.href =
+                    "products.html?category=" + encodeURIComponent(categoryId);
+
+                const icon = document.createElement("div");
+
+                icon.className = "category-icon";
+
+                icon.textContent = getCategoryIcon(name);
+
+                const heading = document.createElement("h3");
+
+                heading.textContent = name;
+
+                const description = document.createElement("p");
+
+                description.textContent =
+                    category.description ||
+                    "Explore our " + name + " collection.";
+
+                card.appendChild(icon);
+                card.appendChild(heading);
+                card.appendChild(description);
+
+                if (products.length > 0) {
+
+                    const count = products.filter(function (product) {
+                        return (
+                            product.cat_id === categoryId &&
+                            product.status === "active"
+                        );
+                    }).length;
+
+                    const badge = document.createElement("span");
+
+                    badge.className = "category-count";
+
+                    badge.textContent =
+                        count + (count === 1 ? " product" : " products");
+
+                    card.appendChild(badge);
+                }
+
+                grid.appendChild(card);
+            });
+
+        } catch (error) {
+
+            console.error("Home Categories Error:", error);
+
+            showMessage("Unable to load categories. Please refresh the page.");
         }
     }
 
-    updateAuthLink();
+    loadHomeCategories();
 
-    authLink.addEventListener("click", function (event) {
-
-        if (sessionStorage.getItem("firebaseIdToken")) {
-
-            event.preventDefault();
-
-            sessionStorage.removeItem("firebaseIdToken");
-            sessionStorage.removeItem("firebaseUserId");
-            sessionStorage.removeItem("firebaseEmail");
-            sessionStorage.removeItem("userRole");
-
-            window.location.replace("login.html");
-        }
-    });
+})();
 </script>
-<script src="js/auth-navigation.js"></script>
 
 </body>
 

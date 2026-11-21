@@ -67,3 +67,89 @@ function sendFirestoreRequest(
         }
     });
 }
+
+
+// =====================================
+// SHARED FIRESTORE HELPERS
+// =====================================
+
+// FULL DOCUMENT NAME (USED BY BATCH COMMITS)
+function firestoreDocumentName(documentPath) {
+
+    return `projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents/${documentPath}`;
+}
+
+
+// GET DOCUMENT ID FROM A FIRESTORE DOCUMENT
+function getDocumentId(document) {
+
+    return document && document.name
+        ? document.name.split("/").pop()
+        : "";
+}
+
+
+// READ EVERY DOCUMENT IN A COLLECTION (FOLLOWS ALL PAGES)
+async function listAllDocuments(collectionName) {
+
+    const documents = [];
+
+    let pageToken = null;
+
+    do {
+
+        let path = `${collectionName}?pageSize=300`;
+
+        if (pageToken) {
+            path += `&pageToken=${encodeURIComponent(pageToken)}`;
+        }
+
+        const response = await sendFirestoreRequest(
+            path,
+            "GET",
+            null,
+            sessionStorage.getItem("firebaseIdToken")
+        );
+
+        (response.documents || []).forEach(function (document) {
+            documents.push(document);
+        });
+
+        pageToken = response.nextPageToken || null;
+
+    } while (pageToken);
+
+    return documents;
+}
+
+
+// APPLY SEVERAL WRITES ATOMICALLY (ALL SUCCEED OR NONE)
+async function commitFirestoreWrites(writes) {
+
+    return sendFirestoreRequest(
+        ":commit",
+        "POST",
+        { writes: writes },
+        sessionStorage.getItem("firebaseIdToken")
+    );
+}
+
+
+// RUN A STRUCTURED QUERY AND RETURN PLAIN DOCUMENTS
+async function runFirestoreQuery(structuredQuery) {
+
+    const response = await sendFirestoreRequest(
+        ":runQuery",
+        "POST",
+        { structuredQuery: structuredQuery },
+        sessionStorage.getItem("firebaseIdToken")
+    );
+
+    return (response || [])
+        .filter(function (result) {
+            return result.document;
+        })
+        .map(function (result) {
+            return result.document;
+        });
+}

@@ -82,3 +82,31 @@ function logoutUser() {
     sessionStorage.removeItem("firebaseEmail");
 
 }
+
+
+// TURN FIREBASE ERROR CODES INTO READABLE MESSAGES
+function getFriendlyAuthError(error) {
+
+    const code =
+        (error && error.error && error.error.message) ||
+        (error && error.message) ||
+        "";
+
+    const messages = {
+        EMAIL_EXISTS: "An account with this email already exists.",
+        EMAIL_NOT_FOUND: "No account found with this email.",
+        INVALID_PASSWORD: "Incorrect password. Please try again.",
+        INVALID_LOGIN_CREDENTIALS: "Incorrect email or password.",
+        INVALID_EMAIL: "Please enter a valid email address.",
+        USER_DISABLED: "This account has been disabled.",
+        TOO_MANY_ATTEMPTS_TRY_LATER: "Too many attempts. Please try again later.",
+        MISSING_PASSWORD: "Please enter your password.",
+        MISSING_EMAIL: "Please enter your email address."
+    };
+
+    if (code.startsWith("WEAK_PASSWORD")) {
+        return "Password must be at least 6 characters.";
+    }
+
+    return messages[code] || code || "Something went wrong. Please try again.";
+}

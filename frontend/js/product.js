@@ -8,6 +8,13 @@
 let allProducts = [];
 let allCategories = [];
 
+// PAGINATION
+
+const PRODUCTS_PER_PAGE = 6;
+
+let currentPage = 1;
+let lastShownProducts = [];
+
 
 // =============================================
 // GET HTML ELEMENTS
@@ -49,7 +56,16 @@ async function loadProductsPage() {
 
         allProducts = (productResponse.documents || [])
             .map(function (document) {
-                return convertFromFirestoreDocument(document);
+
+                const product = convertFromFirestoreDocument(document);
+
+                // USE DOCUMENT ID WHEN THE ID FIELD IS MISSING
+
+                if (!product.id && document.name) {
+                    product.id = document.name.split("/").pop();
+                }
+
+                return product;
             });
 
         allCategories = (categoryResponse.documents || [])
@@ -60,6 +76,20 @@ async function loadProductsPage() {
         // LOAD CATEGORY OPTIONS
 
         loadCategoryOptions();
+
+        // PRESELECT CATEGORY FROM URL (e.g. products.html?category=abc)
+
+        const urlCategory =
+            new URLSearchParams(window.location.search).get("category");
+
+        if (urlCategory) {
+
+            categoryFilter.value = urlCategory;
+
+            applyProductFilters();
+
+            return;
+        }
 
         // DISPLAY PRODUCTS
 
@@ -130,9 +160,15 @@ function getCategoryName(categoryId) {
 // DISPLAY PRODUCTS
 // =============================================
 
-function displayProducts(products) {
+function displayProducts(products, keepPage) {
 
     productGrid.innerHTML = "";
+
+    lastShownProducts = products;
+
+    if (!keepPage) {
+        currentPage = 1;
+    }
 
     // ACTIVE PRODUCTS ONLY
 
@@ -149,10 +185,24 @@ function displayProducts(products) {
             </div>
         `;
 
+        renderPagination(0);
+
         return;
     }
 
-    activeProducts.forEach(function (product) {
+    // CURRENT PAGE ONLY
+
+    const totalPages = Math.ceil(activeProducts.length / PRODUCTS_PER_PAGE);
+
+    currentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+    const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
+
+    const pageProducts = activeProducts.slice(start, start + PRODUCTS_PER_PAGE);
+
+    renderPagination(activeProducts.length);
+
+    pageProducts.forEach(function (product) {
 
         // CREATE PRODUCT CARD
 
@@ -166,9 +216,21 @@ function displayProducts(products) {
 
         image.className = "product-image";
 
-        image.src = "https://placehold.co/400x300?text=Product";
+        const categoryName = getCategoryName(product.cat_id);
+
+        setProductImage(image, product, categoryName);
 
         image.alt = product.title || "Product";
+
+        // IMAGE AREA WITH HOVER DETAILS
+
+        const media = document.createElement("div");
+
+        media.className = "product-media";
+
+        media.appendChild(image);
+
+        media.appendChild(createHoverDetails(product, categoryName));
 
         // PRODUCT INFORMATION
 
@@ -180,7 +242,7 @@ function displayProducts(products) {
 
         category.className = "product-category";
 
-        category.textContent = getCategoryName(product.cat_id);
+        category.textContent = categoryName;
 
         const title = document.createElement("h3");
 
@@ -213,7 +275,7 @@ function displayProducts(products) {
         details.appendChild(price);
         details.appendChild(addButton);
 
-        productCard.appendChild(image);
+        productCard.appendChild(media);
         productCard.appendChild(details);
 
         productGrid.appendChild(productCard);
@@ -224,10 +286,176 @@ function displayProducts(products) {
 
 
 // =============================================
-// CREATE ADD TO CART BUTTON
+// PAGINATION CONTROLS
+// =============================================
+
+function renderPagination(totalProducts) {
+
+    let pager = document.getElementById("product-pagination");
+
+    if (!pager) {
+
+        pager = document.createElement("div");
+
+        pager.id = "product-pagination";
+
+        pager.className = "product-pagination";
+
+        productGrid.after(pager);
+    }
+
+    pager.innerHTML = "";
+
+    const totalPages = Math.ceil(totalProducts / PRODUCTS_PER_PAGE);
+
+    if (totalPages <= 1) {
+        return;
+    }
+
+    function addButton(label, page, disabled, active) {
+
+        const button = document.createElement("button");
+
+        button.type = "button";
+        button.textContent = label;
+        button.disabled = disabled;
+
+        if (active) {
+            button.className = "active";
+            button.setAttribute("aria-current", "page");
+        }
+
+        button.addEventListener("click", function () {
+
+            currentPage = page;
+
+            displayProducts(lastShownProducts, true);
+
+            productGrid.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+
+        pager.appendChild(button);
+    }
+
+    addButton("‹ Prev", currentPage - 1, currentPage === 1, false);
+
+    for (let page = 1; page <= totalPages; page++) {
+        addButton(String(page), page, false, page === currentPage);
+    }
+
+    addButton("Next ›", currentPage + 1, currentPage === totalPages, false);
+
+    const info = document.createElement("span");
+
+    const first = (currentPage - 1) * PRODUCTS_PER_PAGE + 1;
+    const last = Math.min(currentPage * PRODUCTS_PER_PAGE, totalProducts);
+
+    info.textContent = "Showing " + first + "–" + last + " of " + totalProducts;
+
+    pager.appendChild(info);
+}
+
+
+// =============================================
+// HOVER DETAILS OVERLAY
+// =============================================
+
+function createHoverDetails(product, categoryName) {
+
+    const overlay = document.createElement("div");
+
+    overlay.className = "product-hover-details";
+
+    const heading = document.createElement("h4");
+
+    heading.textContent = product.title || "Untitled Product";
+
+    overlay.appendChild(heading);
+
+    const description = document.createElement("p");
+
+    description.className = "hover-description";
+
+    description.textContent =
+        product.description || "No description available";
+
+    overlay.appendChild(description);
+
+    const list = document.createElement("ul");
+
+    function addRow(label, value) {
+
+        const row = document.createElement("li");
+
+        const name = document.createElement("span");
+
+        name.textContent = label;
+
+        const data = document.createElement("strong");
+
+        data.textContent = value;
+
+        row.appendChild(name);
+        row.appendChild(data);
+
+        list.appendChild(row);
+    }
+
+    const stock = Number(product.qty || 0);
+
+    addRow("Category", categoryName);
+
+    addRow("Price", "₹" + Number(product.price || 0).toFixed(2));
+
+    addRow(
+        "Availability",
+        stock > 0 ? stock + " in stock" : "Out of stock"
+    );
+
+    if (product.brand) {
+        addRow("Brand", product.brand);
+    }
+
+    overlay.appendChild(list);
+
+    if (product.id) {
+
+        const link = document.createElement("a");
+
+        link.className = "hover-link";
+
+        link.href =
+            "product-details.html?id=" + encodeURIComponent(product.id);
+
+        link.textContent = "View Full Details →";
+
+        overlay.appendChild(link);
+    }
+
+    return overlay;
+}
+
+
+// =============================================
+// CREATE QUANTITY PICKER + ADD TO CART BUTTON
 // =============================================
 
 function createAddToCartButton(product) {
+
+    const wrapper = document.createElement("div");
+
+    wrapper.className = "cart-controls";
+
+    const stock = Number(product.qty || 0);
+
+    const qtyInput = document.createElement("input");
+
+    qtyInput.type = "number";
+    qtyInput.className = "qty-input";
+    qtyInput.min = 1;
+    qtyInput.max = Math.max(1, stock);
+    qtyInput.value = 1;
+    qtyInput.setAttribute("aria-label", "Quantity for " + (product.title || "product"));
 
     const addButton = document.createElement("button");
 
@@ -235,15 +463,19 @@ function createAddToCartButton(product) {
     addButton.type = "button";
     addButton.textContent = "Add to Cart";
 
+    wrapper.appendChild(qtyInput);
+    wrapper.appendChild(addButton);
+
     // CHECK PRODUCT STOCK
 
-    addButton.disabled = Number(product.qty || 0) <= 0;
+    if (stock <= 0) {
 
-    if (addButton.disabled) {
+        addButton.disabled = true;
+        qtyInput.disabled = true;
 
         addButton.textContent = "Out of Stock";
 
-        return addButton;
+        return wrapper;
     }
 
     // ADD PRODUCT TO CART
@@ -263,15 +495,35 @@ function createAddToCartButton(product) {
             return;
         }
 
+        const quantity = Number(qtyInput.value);
+
+        if (!Number.isInteger(quantity) || quantity < 1) {
+
+            alert("Please choose a quantity of at least 1.");
+
+            qtyInput.value = 1;
+
+            return;
+        }
+
+        if (quantity > stock) {
+
+            alert("Only " + stock + " in stock.");
+
+            qtyInput.value = stock;
+
+            return;
+        }
+
         try {
 
             addButton.disabled = true;
 
             addButton.textContent = "Adding...";
 
-            await addToCart(userId, product);
+            await addToCart(userId, product, quantity);
 
-            addButton.textContent = "Added to Cart!";
+            addButton.textContent = "Added " + quantity + "!";
 
             addButton.style.backgroundColor = "#493B59";
 
@@ -283,13 +535,15 @@ function createAddToCartButton(product) {
 
                 addButton.disabled = false;
 
+                qtyInput.value = 1;
+
             }, 1500);
 
         } catch (error) {
 
             console.error("Add to Cart Error:", error);
 
-            alert("Unable to add product to cart. Please try again.");
+            alert(error.message || "Unable to add product to cart. Please try again.");
 
             addButton.textContent = "Add to Cart";
 
@@ -298,7 +552,7 @@ function createAddToCartButton(product) {
 
     });
 
-    return addButton;
+    return wrapper;
 }
 
 

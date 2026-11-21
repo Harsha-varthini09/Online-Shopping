@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Reports | Elegance Admin</title>
+
+    <script>
+        if (!sessionStorage.getItem("firebaseIdToken")) {
+            window.location.replace("login.html");
+        } else if (sessionStorage.getItem("userRole") !== "admin") {
+            window.location.replace("index.html");
+        }
+    </script>
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+
+    <style>
+        .report-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .report-head p {
+            font-size: 14px;
+        }
+
+        .report-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        #report-stats {
+            margin-bottom: 18px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <a href="admin.html" class="logo">Elegance. <span class="admin-tag">Admin</span></a>
+        <ul class="nav-links">
+            <li><a href="admin.html">Dashboard</a></li>
+            <li><a href="admin-products.html">Inventory</a></li>
+            <li><a href="admin-categories.html">Categories</a></li>
+            <li><a href="admin-customers.html">Customers</a></li>
+            <li><a href="admin-orders.html">Orders</a></li>
+            <li><a href="admin-reports.html">Reports</a></li>
+            <li><a href="index.html">Store</a></li>
+            <li><a href="login.html" id="auth-link">Logout</a></li>
+        </ul>
+    </nav>
+
+    <section class="admin-banner">
+        <h1>Reports</h1>
+        <p>Customer, inventory and sales reports.</p>
+    </section>
+
+    <section class="admin-section">
+        <div class="container">
+
+            <div class="tabs" role="tablist">
+                <button type="button" class="tab active" data-group="customer">Customer Reports</button>
+                <button type="button" class="tab" data-group="inventory">Inventory Reports</button>
+                <button type="button" class="tab" data-group="sales">Sales Reports</button>
+            </div>
+
+            <div class="panel no-print">
+                <div class="toolbar" style="margin-bottom:0">
+
+                    <div class="field grow">
+                        <label for="report-type">Report</label>
+                        <select id="report-type" class="form-control"></select>
+                    </div>
+
+                    <div class="field" id="category-field" hidden>
+                        <label for="report-category">Category</label>
+                        <select id="report-category" class="form-control">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+
+                    <div class="field date-field">
+                        <label for="date-from">From date</label>
+                        <input type="date" id="date-from" class="form-control">
+                    </div>
+
+                    <div class="field date-field">
+                        <label for="date-to">To date</label>
+                        <input type="date" id="date-to" class="form-control">
+                    </div>
+
+                    <button type="button" class="btn" id="generate">Generate</button>
+                    <button type="button" class="btn btn-outline" id="reload-data" title="Fetch the latest data">Refresh Data</button>
+
+                </div>
+            </div>
+
+            <div class="panel">
+
+                <div class="report-head">
+                    <div>
+                        <h3 id="report-title">Loading data...</h3>
+                        <p id="report-subtitle"></p>
+                    </div>
+                    <div class="report-actions no-print">
+                        <button type="button" class="btn btn-outline btn-sm" id="export-csv">Export CSV</button>
+                        <button type="button" class="btn btn-outline btn-sm" id="print-report">Print</button>
+                    </div>
+                </div>
+
+                <div class="stats-grid" id="report-stats"></div>
+
+                <div id="report-table"></div>
+
+            </div>
+
+        </div>
+    </section>
+
+    <footer class="footer">
+        <p>© 2026 Elegance Store. All Rights Reserved.</p>
+    </footer>
+
+
+    <script src="../Backend/firebase-config.js"></script>
+    <script src="../Backend/firestore-api.js"></script>
+    <script src="../Backend/utility.js"></script>
+    <script src="../Backend/payment-api.js"></script>
+    <script src="js/auth-navigation.js"></script>
+    <script src="js/admin-common.js"></script>
+
+    <script>
+    (function () {
+
+        const HIGH_STOCK = 100;   // > 100 units
+        const LOW_STOCK = 15;     // < 15 units
+
+        const REPORTS = {
+            customer: [
+                { id: "c-all", label: "All customers (all columns)", dates: false },
+                { id: "c-top", label: "Top 10 customers", dates: true },
+                { id: "c-cash", label: "Cash purchase report", dates: true },
+                { id: "c-credit", label: "Credit purchase report", dates: true }
+            ],
+            inventory: [
+                { id: "i-stock", label: "Current stock", dates: false, category: true },
+                { id: "i-category", label: "Current stock – category wise", dates: false },
+                { id: "i-high", label: "High stock (more than " + HIGH_STOCK + " units)", dates: false },
+                { id: "i-low", label: "Low stock (less than " + LOW_STOCK + " units)", dates: false }
+            ],
+            sales: [
+                { id: "s-all", label: "All sales", dates: true },
+                { id: "s-category", label: "Sales – category wise", dates: true },
+                { id: "s-cash", label: "Sales – cash wise", dates: true },
+                { id: "s-credit", label: "Sales – credit wise", dates: true },
+                { id: "s-top", label: "Top 10 selling items", dates: true },
+                { id: "s-bottom", label: "Bottom 10 selling items", dates: true }
+            ]
+        };
+
+        let group = "customer";
+        let data = null;
+        let lastReport = null;
+
+        const typeSelect = document.getElementById("report-type");
+        const categorySelect = document.getElementById("report-category");
+        const fromInput = document.getElementById("date-from");
+        const toInput = document.getElementById("date-to");
+
+
+        // =============================================
+        // LOAD ALL DATA ONCE
+        // =============================================
+
+        async function loadData() {
+
+            document.getElementById("report-title").textContent = "Loading data...";
+            document.getElementById("report-subtitle").textContent = "";
+            document.getElementById("report-stats").innerHTML = "";
+            document.getElementById("report-table").innerHTML = "";
+
+            const results = await Promise.all([
+                listAllDocuments("orders"),
+                listAllDocuments("products"),
+                listAllDocuments("categories"),
+                listAllDocuments("users"),
+                listAllDocuments("Customers")
+            ]);
+
+            const orders = documentsToObjects(results[0]).map(function (order) {
+
+                normaliseOrder(order);
+
+                if (!(order.created_at instanceof Date)) {
+                    const document = results[0].find(function (d) { return getDocumentId(d) === order._docId; });
+                    order.created_at = document && document.createTime ? new Date(document.createTime) : null;
+                }
+
+                return order;
+            });
+
+            const products = documentsToObjects(results[1]);
+            const categories = documentsToObjects(results[2]);
+
+            const productMap = {};
+            products.forEach(function (p) { productMap[p._docId] = p; });
+
+            // CUSTOMERS = NON-ADMIN USERS + PROFILES
+
+            const profiles = {};
+            documentsToObjects(results[4]).forEach(function (c) { profiles[c._docId] = c; });
+
+            const customers = {};
+
+            documentsToObjects(results[3]).forEach(function (user) {
+                if (user.role === "admin" || user.disabled === true) return;
+                const id = user.uid || user._docId;
+                customers[id] = makeCustomer(id, profiles[id], user);
+            });
+
+            Object.keys(profiles).forEach(function (id) {
+                if (!customers[id]) customers[id] = makeCustomer(id, profiles[id], null);
+            });
+
+            data = {
+                orders: orders,
+                products: products,
+                productMap: productMap,
+                categories: categories,
+                categoryMap: buildCategoryMap(categories),
+                customers: customers
+            };
+
+            categorySelect.innerHTML = '<option value="">All Categories</option>';
+
+            categories.forEach(function (category) {
+                const option = document.createElement("option");
+                option.value = getCategoryId(category);
+                option.textContent = getCategoryLabel(category);
+                categorySelect.appendChild(option);
+            });
+        }
+
+        function makeCustomer(id, profile, user) {
+
+            profile = profile || {};
+
+            return {
+                id: id,
+                name: profile.name || (user && user.email ? user.email.split("@")[0] : "-"),
+                email: profile.email || (user && user.email) || "",
+                mob: profile.mob || "",
+                credit_limit: Number(profile.credit_limit ?? DEFAULT_CREDIT_LIMIT),
+                credit_used: Number(profile.credit_used || 0),
+                created_at: profile.created_at || (user && user.created_at) || null
+            };
+        }
+
+
+        // =============================================
+        // HELPERS
+        // =============================================
+
+        function ordersInRange(paymentMethod) {
+
+            const range = getDateRange(fromInput, toInput);
+
+            return data.orders.filter(function (order) {
+
+                if (order.order_status === "cancelled") return false;
+
+                if (paymentMethod && order.payment_method !== paymentMethod) return false;
+
+                return order.created_at instanceof Date &&
+                    order.created_at >= range.from &&
+                    order.created_at <= range.to;
+            });
+        }
+
+        function rangeText() {
+
+            if (!fromInput.value && !toInput.value) return "All dates";
+
+            return (fromInput.value || "beginning") + " to " + (toInput.value || "today");
+        }
+
+        function sum(rows, getter) {
+            return rows.reduce(function (total, row) { return total + Number(getter(row) || 0); }, 0);
+        }
+
+        function customerFor(order) {
+            return data.customers[order.user_id] || {
+                id: order.user_id || "-",
+                name: order.customer_name || "-",
+                email: order.customer_email || "",
+                mob: order.phone || "",
+                credit_limit: 0,
+                credit_used: 0
+            };
+        }
+
+        function itemCategory(item) {
+            const product = data.productMap[item.product_id];
+            return item.cat_id || (product && product.cat_id) || "";
+        }
+
+        // Group order totals by customer
+        function purchasesByCustomer(orders) {
+
+            const groups = {};
+
+            orders.forEach(function (order) {
+
+                const customer = customerFor(order);
+
+                const key = customer.id;
+
+                if (!groups[key]) {
+                    groups[key] = { customer: customer, orders: 0, cash: 0, credit: 0, total: 0 };
+                }
+
+                groups[key].orders += 1;
+                groups[key][order.payment_method === "credit" ? "credit" : "cash"] += order.total_amount;
+                groups[key].total += order.total_amount;
+            });
+
+            return Object.values(groups);
+        }
+
+        // Units sold / revenue per product
+        function itemSales(orders) {
+
+            const sales = {};
+
+            orders.forEach(function (order) {
+                order.items.forEach(function (item) {
+
+                    const key = item.product_id || item.title;
+
+                    if (!sales[key]) {
+                        sales[key] = {
+                            id: key,
+                            title: item.title,
+                            category: data.categoryMap[itemCategory(item)] || itemCategory(item) || "-",
+                            units: 0,
+                            revenue: 0
+                        };
+                    }
+
+                    sales[key].units += Number(item.quantity || 0);
+                    sales[key].revenue += Number(item.price || 0) * Number(item.quantity || 0);
+                });
+            });
+
+            return sales;
+        }
+
+        const money = formatMoney;
+
+        const orderColumns = [
+            { label: "Order ID", value: function (o) { return o.order_id; } },
+            { label: "Date", value: function (o) { return formatDateTime(o.created_at); } },
+            { label: "Customer", value: function (o) { return customerFor(o).name; } },
+            { label: "Payment", value: function (o) { return o.payment_method === "credit" ? "Credit" : "Cash"; } },
+            { label: "Items", num: true, value: function (o) { return sum(o.items, function (i) { return i.quantity; }); } },
+            { label: "Amount", num: true, value: function (o) { return money(o.total_amount); } }
+        ];
+
+        function salesStats(orders) {
+
+            const revenue = sum(orders, function (o) { return o.total_amount; });
+
+            return [
+                { label: "Orders", value: orders.length },
+                { label: "Revenue", value: money(revenue) },
+                { label: "Units Sold", value: sum(orders, function (o) { return sum(o.items, function (i) { return i.quantity; }); }) },
+                { label: "Avg. Order", value: money(orders.length ? revenue / orders.length : 0) }
+            ];
+        }
+
+        function productColumns() {
+            return [
+                { label: "ID", value: function (p) { return p._docId; } },
+                { label: "Title", value: function (p) { return p.title; } },
+                { label: "Category", value: function (p) { return data.categoryMap[p.cat_id] || p.cat_id || "-"; } },
+                { label: "Qty", num: true, value: function (p) { return Number(p.qty || 0); } },
+                { label: "Price", num: true, value: function (p) { return money(p.price); } },
+                { label: "Stock Value", num: true, value: function (p) { return money(Number(p.qty || 0) * Number(p.price || 0)); } },
+                { label: "Status", value: function (p) { return p.status || "inactive"; } }
+            ];
+        }
+
+        function productFooter(rows) {
+            return [
+                "Total", rows.length + " products", "",
+                sum(rows, function (p) { return p.qty; }),
+                "",
+                money(sum(rows, function (p) { return Number(p.qty || 0) * Number(p.price || 0); })),
+                ""
+            ];
+        }
+
+
+        // =============================================
+        // REPORT BUILDERS
+        // =============================================
+
+        const builders = {
+
+            // ---------- CUSTOMER ----------
+
+            "c-all": function () {
+
+                const allOrders = data.orders.filter(function (o) { return o.order_status !== "cancelled"; });
+
+                const totals = {};
+
+                purchasesByCustomer(allOrders).forEach(function (g) { totals[g.customer.id] = g; });
+
+                const rows = Object.values(data.customers).sort(function (a, b) {
+                    return a.name.localeCompare(b.name);
+                });
+
+                return {
+                    title: "All Customers",
+                    subtitle: rows.length + " customers · all columns",
+                    columns: [
+                        { label: "ID", value: function (c) { return c.id; } },
+                        { label: "Name", value: function (c) { return c.name; } },
+                        { label: "Email", value: function (c) { return c.email || "-"; } },
+                        { label: "Mobile", value: function (c) { return c.mob || "-"; } },
+                        { label: "Credit Limit", num: true, value: function (c) { return money(c.credit_limit); } },
+                        { label: "Credit Used", num: true, value: function (c) { return money(c.credit_used); } },
+                        { label: "Available", num: true, value: function (c) { return money(Math.max(0, c.credit_limit - c.credit_used)); } },
+                        { label: "Orders", num: true, value: function (c) { return totals[c.id] ? totals[c.id].orders : 0; } },
+                        { label: "Total Purchases", num: true, value: function (c) { return money(totals[c.id] ? totals[c.id].total : 0); } }
+                    ],
+                    rows: rows
+                };
+            },
+
+            "c-top": function () {
+
+                const rows = purchasesByCustomer(ordersInRange())
+                    .sort(function (a, b) { return b.total - a.total; })
+                    .slice(0, 10);
+
+                rows.forEach(function (row, index) { row.rank = index + 1; });
+
+                return {
+                    title: "Top 10 Customers",
+                    subtitle: rangeText() + " · ranked by total purchases",
+                    columns: [
+                        { label: "Rank", value: function (r) { return r.rank; } },
+                        { label: "Name", value: function (r) { return r.customer.name; } },
+                        { label: "Email", value: function (r) { return r.customer.email || "-"; } },
+                        { label: "Mobile", value: function (r) { return r.customer.mob || "-"; } },
+                        { label: "Orders", num: true, value: function (r) { return r.orders; } },
+                        { label: "Cash", num: true, value: function (r) { return money(r.cash); } },
+                        { label: "Credit", num: true, value: function (r) { return money(r.credit); } },
+                        { label: "Total", num: true, value: function (r) { return money(r.total); } }
+                    ],
+                    rows: rows
+                };
+            },
+
+            "c-cash": function () {
+
+                const rows = purchasesByCustomer(ordersInRange("cash"))
+                    .sort(function (a, b) { return b.total - a.total; });
+
+                return {
+                    title: "Cash Purchase Report",
+                    subtitle: rangeText(),
+                    stats: [
+                        { label: "Customers", value: rows.length },
+                        { label: "Cash Orders", value: sum(rows, function (r) { return r.orders; }) },
+                        { label: "Cash Purchases", value: money(sum(rows, function (r) { return r.total; })) }
+                    ],
+                    columns: [
+                        { label: "Name", value: function (r) { return r.customer.name; } },
+                        { label: "Email", value: function (r) { return r.customer.email || "-"; } },
+                        { label: "Mobile", value: function (r) { return r.customer.mob || "-"; } },
+                        { label: "Orders", num: true, value: function (r) { return r.orders; } },
+                        { label: "Cash Purchases", num: true, value: function (r) { return money(r.total); } }
+                    ],
+                    rows: rows,
+                    footer: ["Total", "", "", sum(rows, function (r) { return r.orders; }), money(sum(rows, function (r) { return r.total; }))]
+                };
+            },
+
+            "c-credit": function () {
+
+                const rows = purchasesByCustomer(ordersInRange("credit"))
+                    .sort(function (a, b) { return b.total - a.total; });
+
+                return {
+                    title: "Credit Purchase Report",
+                    subtitle: rangeText() + " · limit / used / available are current values",
+                    stats: [
+                        { label: "Customers", value: rows.length },
+                        { label: "Credit Orders", value: sum(rows, function (r) { return r.orders; }) },
+                        { label: "Credit Purchases", value: money(sum(rows, function (r) { return r.total; })) }
+                    ],
+                    columns: [
+                        { label: "Name", value: function (r) { return r.customer.name; } },
+                        { label: "Email", value: function (r) { return r.customer.email || "-"; } },
+                        { label: "Orders", num: true, value: function (r) { return r.orders; } },
+                        { label: "Credit Purchases", num: true, value: function (r) { return money(r.total); } },
+                        { label: "Credit Limit", num: true, value: function (r) { return money(r.customer.credit_limit); } },
+                        { label: "Credit Used", num: true, value: function (r) { return money(r.customer.credit_used); } },
+                        { label: "Available", num: true, value: function (r) { return money(Math.max(0, r.customer.credit_limit - r.customer.credit_used)); } }
+                    ],
+                    rows: rows,
+                    footer: ["Total", "", sum(rows, function (r) { return r.orders; }), money(sum(rows, function (r) { return r.total; })), "", "", ""]
+                };
+            },
+
+            // ---------- INVENTORY ----------
+
+            "i-stock": function () {
+
+                const category = categorySelect.value;
+
+                const rows = data.products
+                    .filter(function (p) { return !category || p.cat_id === category; })
+                    .sort(function (a, b) { return String(a.title).localeCompare(String(b.title)); });
+
+                return {
+                    title: "Current Stock",
+                    subtitle: category ? "Category: " + (data.categoryMap[category] || category) : "All categories",
+                    columns: productColumns(),
+                    rows: rows,
+                    footer: productFooter(rows)
+                };
+            },
+
+            "i-category": function () {
+
+                const groups = {};
+
+                data.categories.forEach(function (c) {
+                    groups[getCategoryId(c)] = { name: getCategoryLabel(c), products: 0, units: 0, value: 0, low: 0 };
+                });
+
+                data.products.forEach(function (p) {
+
+                    const key = p.cat_id || "(none)";
+
+                    if (!groups[key]) groups[key] = { name: data.categoryMap[key] || key, products: 0, units: 0, value: 0, low: 0 };
+
+                    const qty = Number(p.qty || 0);
+
+                    groups[key].products += 1;
+                    groups[key].units += qty;
+                    groups[key].value += qty * Number(p.price || 0);
+                    if (qty < LOW_STOCK) groups[key].low += 1;
+                });
+
+                const rows = Object.values(groups).sort(function (a, b) { return b.units - a.units; });
+
+                return {
+                    title: "Current Stock – Category Wise",
+                    subtitle: rows.length + " categories",
+                    columns: [
+                        { label: "Category", value: function (r) { return r.name; } },
+                        { label: "Products", num: true, value: function (r) { return r.products; } },
+                        { label: "Units in Stock", num: true, value: function (r) { return r.units; } },
+                        { label: "Stock Value", num: true, value: function (r) { return money(r.value); } },
+                        { label: "Low-stock Items", num: true, value: function (r) { return r.low; } }
+                    ],
+                    rows: rows,
+                    footer: [
+                        "Total",
+                        sum(rows, function (r) { return r.products; }),
+                        sum(rows, function (r) { return r.units; }),
+                        money(sum(rows, function (r) { return r.value; })),
+                        sum(rows, function (r) { return r.low; })
+                    ]
+                };
+            },
+
+            "i-high": function () {
+
+                const rows = data.products
+                    .filter(function (p) { return Number(p.qty || 0) > HIGH_STOCK; })
+                    .sort(function (a, b) { return Number(b.qty) - Number(a.qty); });
+
+                return {
+                    title: "High Stock (> " + HIGH_STOCK + " units)",
+                    subtitle: rows.length + " products",
+                    columns: productColumns(),
+                    rows: rows,
+                    footer: productFooter(rows)
+                };
+            },
+
+            "i-low": function () {
+
+                const rows = data.products
+                    .filter(function (p) { return Number(p.qty || 0) < LOW_STOCK; })
+                    .sort(function (a, b) { return Number(a.qty || 0) - Number(b.qty || 0); });
+
+                return {
+                    title: "Low Stock (< " + LOW_STOCK + " units)",
+                    subtitle: rows.length + " products need restocking",
+                    columns: productColumns(),
+                    rows: rows,
+                    footer: productFooter(rows)
+                };
+            },
+
+            // ---------- SALES ----------
+
+            "s-all": function () { return salesList("All Sales", ordersInRange()); },
+            "s-cash": function () { return salesList("Sales – Cash Wise", ordersInRange("cash")); },
+            "s-credit": function () { return salesList("Sales – Credit Wise", ordersInRange("credit")); },
+
+            "s-category": function () {
+
+                const orders = ordersInRange();
+                const groups = {};
+
+                orders.forEach(function (order) {
+                    order.items.forEach(function (item) {
+
+                        const key = itemCategory(item) || "(none)";
+
+                        if (!groups[key]) groups[key] = { name: data.categoryMap[key] || key, units: 0, revenue: 0, orders: new Set() };
+
+                        groups[key].units += Number(item.quantity || 0);
+                        groups[key].revenue += Number(item.price || 0) * Number(item.quantity || 0);
+                        groups[key].orders.add(order.order_id);
+                    });
+                });
+
+                const rows = Object.values(groups).sort(function (a, b) { return b.revenue - a.revenue; });
+                const total = sum(rows, function (r) { return r.revenue; });
+
+                return {
+                    title: "Sales – Category Wise",
+                    subtitle: rangeText(),
+                    stats: salesStats(orders),
+                    columns: [
+                        { label: "Category", value: function (r) { return r.name; } },
+                        { label: "Orders", num: true, value: function (r) { return r.orders.size; } },
+                        { label: "Units Sold", num: true, value: function (r) { return r.units; } },
+                        { label: "Revenue", num: true, value: function (r) { return money(r.revenue); } },
+                        { label: "Share", num: true, value: function (r) { return total ? (r.revenue / total * 100).toFixed(1) + "%" : "0%"; } }
+                    ],
+                    rows: rows,
+                    footer: ["Total", "", sum(rows, function (r) { return r.units; }), money(total), total ? "100%" : ""]
+                };
+            },
+
+            "s-top": function () { return sellingItems(true); },
+            "s-bottom": function () { return sellingItems(false); }
+        };
+
+        function salesList(title, orders) {
+
+            const rows = orders.slice().sort(function (a, b) { return b.created_at - a.created_at; });
+
+            return {
+                title: title,
+                subtitle: rangeText(),
+                stats: salesStats(rows),
+                columns: orderColumns,
+                rows: rows,
+                footer: [
+                    "Total", "", rows.length + " orders", "",
+                    sum(rows, function (o) { return sum(o.items, function (i) { return i.quantity; }); }),
+                    money(sum(rows, function (o) { return o.total_amount; }))
+                ]
+            };
+        }
+
+        function sellingItems(top) {
+
+            const sales = itemSales(ordersInRange());
+
+            // INCLUDE PRODUCTS THAT SOLD NOTHING (IMPORTANT FOR BOTTOM 10)
+            data.products.forEach(function (p) {
+                if (!sales[p._docId]) {
+                    sales[p._docId] = {
+                        id: p._docId,
+                        title: p.title,
+                        category: data.categoryMap[p.cat_id] || p.cat_id || "-",
+                        units: 0,
+                        revenue: 0
+                    };
+                }
+            });
+
+            const rows = Object.values(sales)
+                .sort(function (a, b) {
+                    const diff = top ? b.units - a.units : a.units - b.units;
+                    return diff || (top ? b.revenue - a.revenue : a.revenue - b.revenue);
+                })
+                .slice(0, 10);
+
+            rows.forEach(function (row, index) { row.rank = index + 1; });
+
+            return {
+                title: top ? "Top 10 Selling Items" : "Bottom 10 Selling Items",
+                subtitle: rangeText() + " · by units sold",
+                columns: [
+                    { label: "Rank", value: function (r) { return r.rank; } },
+                    { label: "Product ID", value: function (r) { return r.id; } },
+                    { label: "Product", value: function (r) { return r.title; } },
+                    { label: "Category", value: function (r) { return r.category; } },
+                    { label: "Units Sold", num: true, value: function (r) { return r.units; } },
+                    { label: "Revenue", num: true, value: function (r) { return money(r.revenue); } }
+                ],
+                rows: rows
+            };
+        }
+
+
+        // =============================================
+        // UI
+        // =============================================
+
+        function currentDefinition() {
+            return REPORTS[group].find(function (r) { return r.id === typeSelect.value; });
+        }
+
+        function fillReportOptions() {
+
+            typeSelect.innerHTML = "";
+
+            REPORTS[group].forEach(function (report) {
+                const option = document.createElement("option");
+                option.value = report.id;
+                option.textContent = report.label;
+                typeSelect.appendChild(option);
+            });
+
+            updateFields();
+        }
+
+        function updateFields() {
+
+            const definition = currentDefinition();
+
+            document.querySelectorAll(".date-field").forEach(function (field) {
+                field.hidden = !definition.dates;
+            });
+
+            document.getElementById("category-field").hidden = !definition.category;
+        }
+
+        function generate() {
+
+            if (!data) return;
+
+            const definition = currentDefinition();
+
+            if (definition.dates && fromInput.value && toInput.value && fromInput.value > toInput.value) {
+                showToast("“From date” must be before “To date”.", "error");
+                return;
+            }
+
+            const report = builders[definition.id]();
+
+            lastReport = report;
+
+            document.getElementById("report-title").textContent = report.title;
+            document.getElementById("report-subtitle").textContent =
+                report.subtitle + " · generated " + formatDateTime(new Date());
+
+            const statsBox = document.getElementById("report-stats");
+            statsBox.innerHTML = "";
+
+            (report.stats || []).forEach(function (stat) {
+                const card = document.createElement("div");
+                card.className = "stat-card";
+                const label = document.createElement("span");
+                label.textContent = stat.label;
+                const value = document.createElement("strong");
+                value.textContent = stat.value;
+                card.appendChild(label);
+                card.appendChild(value);
+                statsBox.appendChild(card);
+            });
+
+            statsBox.hidden = !(report.stats && report.stats.length);
+
+            renderDataTable(
+                document.getElementById("report-table"),
+                report.columns,
+                report.rows,
+                { footer: report.footer, emptyText: "No data for this report." }
+            );
+        }
+
+        document.querySelectorAll(".tab").forEach(function (tab) {
+            tab.addEventListener("click", function () {
+                group = tab.dataset.group;
+                document.querySelectorAll(".tab").forEach(function (t) {
+                    t.classList.toggle("active", t === tab);
+                });
+                fillReportOptions();
+                generate();
+            });
+        });
+
+        typeSelect.addEventListener("change", function () { updateFields(); generate(); });
+        categorySelect.addEventListener("change", generate);
+        document.getElementById("generate").addEventListener("click", generate);
+
+        document.getElementById("reload-data").addEventListener("click", function () {
+            start();
+        });
+
+        document.getElementById("export-csv").addEventListener("click", function () {
+            if (!lastReport) return;
+            const name = lastReport.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + toInputDate(new Date()) + ".csv";
+            downloadCsv(name, lastReport.columns, lastReport.rows, lastReport.footer);
+        });
+
+        document.getElementById("print-report").addEventListener("click", function () {
+            window.print();
+        });
+
+
+        // DEFAULT RANGE: LAST 30 DAYS
+
+        const today = new Date();
+        const monthAgo = new Date(today.getTime() - 29 * 86400000);
+
+        fromInput.value = toInputDate(monthAgo);
+        toInput.value = toInputDate(today);
+
+        fillReportOptions();
+
+        async function start() {
+
+            try {
+
+                await loadData();
+
+                generate();
+
+            } catch (error) {
+
+                console.error("Reports Error:", error);
+
+                document.getElementById("report-title").textContent = "Unable to load report data";
+                document.getElementById("report-subtitle").textContent = getErrorMessage(error);
+            }
+        }
+
+        start();
+
+    })();
+    </script>
+
+</body>
+
+</html>

@@ -37,7 +37,8 @@
         .product-image {
             width: 100%;
             min-height: 300px;
-            object-fit: contain;
+            max-height: 420px;
+            object-fit: cover;
             border-radius: 12px;
             background: #FFF9F2;
         }
@@ -91,6 +92,37 @@
             font-weight: bold;
         }
 
+        .qty-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .qty-row label {
+            font-weight: bold;
+            color: #493B59;
+        }
+
+        .qty-input {
+            width: 80px;
+            padding: 10px;
+            border: 1px solid #EAE1ED;
+            border-radius: 8px;
+        }
+
+        .product-category-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8C8492;
+        }
+
+        .add-cart-btn:disabled {
+            background: #aaa;
+            cursor: not-allowed;
+        }
+
         @media (max-width: 700px) {
             .details-card {
                 grid-template-columns: 1fr;
@@ -100,6 +132,17 @@
 </head>
 
 <body>
+
+    <nav class="navbar">
+        <a href="index.html" class="logo">Elegance.</a>
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="products.html">Products</a></li>
+            <li><a href="cart.html">Cart</a></li>
+            <li><a href="my-orders.html">My Orders</a></li>
+            <li><a href="login.html" id="auth-link">Login</a></li>
+        </ul>
+    </nav>
 
     <main class="details-container">
 
@@ -122,7 +165,9 @@
     <script src="../Backend/firestore-api.js"></script>
     <script src="../Backend/utility.js"></script>
     <script src="../Backend/product-api.js"></script>
+    <script src="../Backend/category-api.js"></script>
     <script src="../Backend/cart-api.js"></script>
+    <script src="js/product-image.js"></script>
 
     <script>
 
@@ -205,17 +250,9 @@
 
             image.className = "product-image";
 
-            image.src =
-                product.image_url ||
-                product.imageUrl ||
-                "https://placehold.co/500x400?text=Product";
+            setProductImage(image, product, "");
 
             image.alt = product.title || "Product";
-
-            image.onerror = function () {
-                this.src =
-                    "https://placehold.co/500x400?text=Product";
-            };
 
             // PRODUCT INFORMATION
             const info =
@@ -251,9 +288,54 @@
 
             stock.className = "product-stock";
 
-            stock.textContent =
-                "Available Quantity: " +
-                (product.qty ?? "Not specified");
+            const stockCount = Number(product.qty || 0);
+
+            stock.textContent = stockCount > 0
+                ? "In stock: " + stockCount + (stockCount < 15 ? " (only a few left!)" : "")
+                : "Out of stock";
+
+            // CATEGORY NAME (BEST-EFFORT)
+
+            const categoryLabel = document.createElement("p");
+
+            categoryLabel.className = "product-category-label";
+
+            if (product.cat_id) {
+                getCategories().then(function (response) {
+                    const match = (response.documents || []).find(function (document) {
+                        return document.name.split("/").pop() === product.cat_id;
+                    });
+                    if (match) {
+                        const category = convertFromFirestoreDocument(match);
+                        categoryLabel.textContent = category.name || category.categoryName || "";
+                    }
+                }).catch(function () {});
+            }
+
+            // QUANTITY SELECTOR
+
+            const qtyRow = document.createElement("div");
+
+            qtyRow.className = "qty-row";
+
+            const qtyLabel = document.createElement("label");
+
+            qtyLabel.htmlFor = "qty-input";
+
+            qtyLabel.textContent = "Quantity";
+
+            const qtyInput = document.createElement("input");
+
+            qtyInput.type = "number";
+            qtyInput.id = "qty-input";
+            qtyInput.className = "qty-input";
+            qtyInput.min = 1;
+            qtyInput.max = Math.max(1, stockCount);
+            qtyInput.value = 1;
+            qtyInput.disabled = stockCount <= 0 || product.status !== "active";
+
+            qtyRow.appendChild(qtyLabel);
+            qtyRow.appendChild(qtyInput);
 
             const addButton =
                 document.createElement("button");
@@ -262,16 +344,24 @@
 
             addButton.textContent = "Add to Cart";
 
+            addButton.disabled = stockCount <= 0 || product.status !== "active";
+
+            if (addButton.disabled) {
+                addButton.textContent = product.status !== "active" ? "Unavailable" : "Out of Stock";
+            }
+
             addButton.onclick = function () {
 
-                addProductToCart(product, addButton);
+                addProductToCart(product, addButton, qtyInput.value);
 
             };
 
+            info.appendChild(categoryLabel);
             info.appendChild(title);
             info.appendChild(price);
             info.appendChild(description);
             info.appendChild(stock);
+            info.appendChild(qtyRow);
             info.appendChild(addButton);
 
             card.appendChild(image);
@@ -283,7 +373,7 @@
 
 
         // ADD PRODUCT TO CART
-        async function addProductToCart(product, button) {
+        async function addProductToCart(product, button, quantity) {
 
             const message =
                 document.getElementById("product-message");
@@ -317,30 +407,47 @@
 
             }
 
+            quantity = Number(quantity);
+
+            if (!Number.isInteger(quantity) || quantity < 1) {
+
+                message.textContent = "Please choose a quantity of at least 1.";
+
+                return;
+            }
+
+            if (quantity > Number(product.qty)) {
+
+                message.textContent = "Only " + Number(product.qty) + " in stock.";
+
+                return;
+            }
+
             try {
 
                 button.disabled = true;
 
                 button.textContent = "Adding...";
 
-                await addToCart(userId, product);
+                await addToCart(userId, product, quantity);
 
                 message.textContent =
-                    "Product added to cart successfully!";
+                    quantity + " × " + product.title + " added to your cart.";
 
-                button.textContent = "Added to Cart";
+                button.textContent = "Add More";
 
             } catch (error) {
 
                 console.error("Add to Cart Error:", error);
 
                 message.textContent =
-                    "Unable to add product to cart.";
-
-                button.disabled = false;
+                    error.message || "Unable to add product to cart.";
 
                 button.textContent = "Add to Cart";
 
+            } finally {
+
+                button.disabled = false;
             }
 
         }

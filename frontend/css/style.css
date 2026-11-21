@@ -330,3 +330,48 @@ p {
         width: 94%;
     }
 }
+
+
+/* 13. SHOW / HIDE PASSWORD BUTTON */
+
+.password-wrapper {
+    position: relative;
+}
+
+.password-wrapper .form-control {
+    padding-right: 48px;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 32px;
+    height: 32px;
+
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.password-toggle:hover,
+.password-toggle:focus-visible {
+    color: var(--rose);
+    background: var(--lavender-light);
+    outline: none;
+}
+
+/* Hide the browser's own reveal icon (Edge) so there is only one */
+input::-ms-reveal {
+    display: none;
+}

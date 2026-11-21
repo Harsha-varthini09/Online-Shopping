@@ -260,6 +260,8 @@
     <script src="../Backend/auth-service.js"></script>
 
 
+    <script src="js/password-toggle.js"></script>
+
     <!-- LOGIN JAVASCRIPT -->
 
     <script>
@@ -285,6 +287,20 @@ loginForm.addEventListener("submit", async function (event) {
     const password =
         document.getElementById("password").value;
 
+    // VALIDATION
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        loginMessage.className = "message-error";
+        loginMessage.textContent = "Please enter a valid email address.";
+        return;
+    }
+
+    if (!password) {
+        loginMessage.className = "message-error";
+        loginMessage.textContent = "Please enter your password.";
+        return;
+    }
+
 
 loginButton.disabled = true;
 
@@ -308,15 +324,16 @@ loginMessage.textContent = "";
         loginMessage.className = "message-success";
 
         loginMessage.textContent =
-            result.message + " Role: " + result.role;
+            result.message + (result.role === "admin" ? " Opening admin dashboard..." : "");
 
 
-        // REDIRECT TO HOMEPAGE AFTER 1.5 SECONDS
+        // ADMIN -> DASHBOARD, CUSTOMERS -> HOMEPAGE
         setTimeout(function () {
 
-            window.location.href = "index.html";
+            window.location.href =
+                result.role === "admin" ? "admin.html" : "index.html";
 
-        }, 1500);
+        }, 1000);
 
 
     } catch (error) {
@@ -325,15 +342,28 @@ loginMessage.textContent = "";
 
         loginMessage.className = "message-error";
 
-        loginMessage.textContent =
-            error.message ||
-            error.error?.message ||
-            "Login failed. Please check your details.";
+        if (error.status === 403) {
+            // FIRESTORE RULES REJECTED READING / REPAIRING THE ACCOUNT RECORD
+            logoutAccount();
+            console.error(
+                "[Store setup] Firestore denied access to users/{uid}. " +
+                "Publish firestore.rules in the Firebase console.", error.error
+            );
+            loginMessage.textContent =
+                "Signed in, but your account record could not be loaded (permission denied). Please contact the store.";
+        } else if (error.status) {
+            logoutAccount();
+            loginMessage.textContent =
+                "Unable to load your account. Please try again.";
+        } else {
+            logoutAccount();
+            loginMessage.textContent = getFriendlyAuthError(error);
+        }
 
-loginButton.disabled = true;
-loginButton.style.backgroundColor = "#493B59";
-loginButton.style.color = "white";
-loginButton.textContent = "Logging in...";
+        // LET THE USER TRY AGAIN
+        loginButton.disabled = false;
+        loginButton.textContent = "Login";
+        loginButton.classList.remove("login-processing");
     }
 
 });
