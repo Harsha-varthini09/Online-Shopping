@@ -1,0 +1,358 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Product Details - Online Shopping</title>
+
+    <link rel="stylesheet" href="css/style.css">
+
+    <style>
+        body {
+            background: #FFF9F2;
+            color: #4B4352;
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+
+        .details-container {
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+
+        .details-card {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 35px;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(73, 59, 89, 0.08);
+        }
+
+        .product-image {
+            width: 100%;
+            min-height: 300px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: #FFF9F2;
+        }
+
+        .product-info h1 {
+            color: #493B59;
+            margin-top: 0;
+        }
+
+        .product-price {
+            color: #C77D91;
+            font-size: 27px;
+            font-weight: bold;
+        }
+
+        .product-description {
+            line-height: 1.8;
+            color: #8C8492;
+        }
+
+        .product-stock {
+            color: #493B59;
+            margin: 15px 0;
+        }
+
+        .add-cart-btn {
+            background: #B8A4D9;
+            color: white;
+            border: none;
+            padding: 14px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        .add-cart-btn:hover {
+            background: #9279B8;
+        }
+
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #9279B8;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .message {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 700px) {
+            .details-card {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <main class="details-container">
+
+        <a href="products.html" class="back-btn">
+            ← Back to Products
+        </a>
+
+        <div id="product-details">
+
+            <p>Loading product details...</p>
+
+        </div>
+
+        <p id="product-message" class="message"></p>
+
+    </main>
+
+    <!-- BACKEND FILES -->
+    <script src="../Backend/firebase-config.js"></script>
+    <script src="../Backend/firestore-api.js"></script>
+    <script src="../Backend/utility.js"></script>
+    <script src="../Backend/product-api.js"></script>
+    <script src="../Backend/cart-api.js"></script>
+
+    <script>
+
+        // GET LOGGED-IN USER
+        const userId =
+            sessionStorage.getItem("firebaseUserId");
+
+        const token =
+            sessionStorage.getItem("firebaseIdToken");
+
+
+        // GET PRODUCT ID FROM URL
+        const urlParams =
+            new URLSearchParams(window.location.search);
+
+        const productId =
+            urlParams.get("id");
+
+
+        // LOAD PRODUCT DETAILS
+        async function loadProductDetails() {
+
+            const container =
+                document.getElementById("product-details");
+
+            if (!productId) {
+
+                container.textContent =
+                    "Product ID is missing.";
+
+                return;
+
+            }
+
+            try {
+
+                // GET PRODUCT FROM FIREBASE
+                const response =
+                    await getProductById(productId);
+
+                const product =
+                    convertFromFirestoreDocument(response);
+
+                // STORE DOCUMENT ID
+                product.id = productId;
+
+                displayProductDetails(product);
+
+            } catch (error) {
+
+                console.error(
+                    "Product Details Error:",
+                    error
+                );
+
+                container.textContent =
+                    "Unable to load product details.";
+
+            }
+
+        }
+
+
+        // DISPLAY PRODUCT
+        function displayProductDetails(product) {
+
+            const container =
+                document.getElementById("product-details");
+
+            container.innerHTML = "";
+
+            const card =
+                document.createElement("div");
+
+            card.className = "details-card";
+
+            // PRODUCT IMAGE
+            const image =
+                document.createElement("img");
+
+            image.className = "product-image";
+
+            image.src =
+                product.image_url ||
+                product.imageUrl ||
+                "https://placehold.co/500x400?text=Product";
+
+            image.alt = product.title || "Product";
+
+            image.onerror = function () {
+                this.src =
+                    "https://placehold.co/500x400?text=Product";
+            };
+
+            // PRODUCT INFORMATION
+            const info =
+                document.createElement("div");
+
+            info.className = "product-info";
+
+            const title =
+                document.createElement("h1");
+
+            title.textContent =
+                product.title || "Product Name";
+
+            const price =
+                document.createElement("p");
+
+            price.className = "product-price";
+
+            price.textContent =
+                "₹" + Number(product.price || 0).toFixed(2);
+
+            const description =
+                document.createElement("p");
+
+            description.className = "product-description";
+
+            description.textContent =
+                product.description ||
+                "No product description available.";
+
+            const stock =
+                document.createElement("p");
+
+            stock.className = "product-stock";
+
+            stock.textContent =
+                "Available Quantity: " +
+                (product.qty ?? "Not specified");
+
+            const addButton =
+                document.createElement("button");
+
+            addButton.className = "add-cart-btn";
+
+            addButton.textContent = "Add to Cart";
+
+            addButton.onclick = function () {
+
+                addProductToCart(product, addButton);
+
+            };
+
+            info.appendChild(title);
+            info.appendChild(price);
+            info.appendChild(description);
+            info.appendChild(stock);
+            info.appendChild(addButton);
+
+            card.appendChild(image);
+            card.appendChild(info);
+
+            container.appendChild(card);
+
+        }
+
+
+        // ADD PRODUCT TO CART
+        async function addProductToCart(product, button) {
+
+            const message =
+                document.getElementById("product-message");
+
+            if (!userId || !token) {
+
+                window.location.href = "login.html";
+
+                return;
+
+            }
+
+            if (
+                product.status &&
+                product.status !== "active"
+            ) {
+
+                message.textContent =
+                    "This product is currently unavailable.";
+
+                return;
+
+            }
+
+            if (Number(product.qty) <= 0) {
+
+                message.textContent =
+                    "This product is out of stock.";
+
+                return;
+
+            }
+
+            try {
+
+                button.disabled = true;
+
+                button.textContent = "Adding...";
+
+                await addToCart(userId, product);
+
+                message.textContent =
+                    "Product added to cart successfully!";
+
+                button.textContent = "Added to Cart";
+
+            } catch (error) {
+
+                console.error("Add to Cart Error:", error);
+
+                message.textContent =
+                    "Unable to add product to cart.";
+
+                button.disabled = false;
+
+                button.textContent = "Add to Cart";
+
+            }
+
+        }
+
+
+        // START
+        loadProductDetails();
+
+    </script>
+
+    <script src="js/auth-navigation.js"></script>
+
+</body>
+
+</html>

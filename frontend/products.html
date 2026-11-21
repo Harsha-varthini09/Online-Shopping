@@ -179,33 +179,40 @@
 
     <!-- NAVIGATION BAR -->
 
-    <nav class="navbar">
+ <nav class="navbar">
 
-        <a href="index.html" class="logo">
-            Elegance.
-        </a>
+    <a href="index.html" class="logo">
+        Elegance.
+    </a>
 
-        <ul class="nav-links">
+    <ul class="nav-links">
 
-            <li>
-                <a href="index.html">Home</a>
-            </li>
+        <li>
+            <a href="index.html">Home</a>
+        </li>
 
-            <li>
-                <a href="products.html">Products</a>
-            </li>
+        <li>
+            <a href="products.html">Products</a>
+        </li>
 
-            <li>
-                <a href="login.html">Login</a>
-            </li>
+        <li>
+            <a href="cart.html">Cart</a>
+        </li>
+        <li>
+            <a href="my-orders.html">My Orders</a>
+        </li>
 
-            <li>
-                <a href="register.html">Register</a>
-            </li>
+        <li>
+            <a href="login.html" id="auth-link">Login</a>
+        </li>
 
-        </ul>
+        <li>
+            <a href="register.html" id="register-link">Register</a>
+        </li>
 
-    </nav>
+    </ul>
+
+</nav>
 
 
     <!-- PRODUCTS BANNER -->
@@ -278,24 +285,11 @@
 
                         <select id="category-filter">
 
-                            <option value="">
-                                All Categories
-                            </option>
+    <option value="">
+        All Categories
+    </option>
 
-                            <option value="Fashion">
-                                Fashion
-                            </option>
-
-                            <option value="Accessories">
-                                Accessories
-                            </option>
-
-                            <option value="Home & Living">
-                                Home & Living
-                            </option>
-
-                        </select>
-
+</select>
                     </div>
 
 
@@ -389,6 +383,7 @@
 <script src="../Backend/category-api.js"></script>
 <script src="../Backend/cart-api.js"></script>
 <script src="../Backend/utility.js"></script>
+<script src="js/auth-navigation.js"></script>
 <script src="js/product.js"></script>
 
 

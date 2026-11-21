@@ -1,0 +1,349 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>My Orders - Online Shopping</title>
+
+    <link rel="stylesheet" href="css/style.css">
+
+    <style>
+        body {
+            background: #FFF9F2;
+            color: #4B4352;
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+
+        .orders-container {
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .orders-title {
+            text-align: center;
+            color: #493B59;
+            margin-bottom: 30px;
+        }
+
+        .order-card {
+            background: white;
+            padding: 25px;
+            border-radius: 14px;
+            margin-bottom: 22px;
+            box-shadow: 0 4px 15px rgba(73, 59, 89, 0.08);
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            border-bottom: 1px solid #EAE1ED;
+            padding-bottom: 15px;
+        }
+
+        .order-header h3 {
+            color: #493B59;
+            margin: 0;
+        }
+
+        .order-status {
+            background: #F2C6D0;
+            color: #493B59;
+            padding: 7px 13px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .order-details {
+            line-height: 1.8;
+            padding-top: 15px;
+        }
+
+        .order-products {
+            background: #FFF9F2;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .order-total {
+            color: #C77D91;
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+
+        .empty-orders {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+        }
+
+        .empty-orders a {
+            color: #9279B8;
+            font-weight: bold;
+        }
+
+        .message {
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <main class="orders-container">
+
+        <h1 class="orders-title">My Orders</h1>
+
+        <div id="orders-list" class="message">
+            Loading your orders...
+        </div>
+
+    </main>
+
+    <!-- FIREBASE AND BACKEND FILES -->
+    <script src="../Backend/firebase-config.js"></script>
+    <script src="../Backend/firestore-api.js"></script>
+    <script src="../Backend/utility.js"></script>
+    <script src="../Backend/order-api.js"></script>
+
+    <script>
+
+        const userId =
+            sessionStorage.getItem("firebaseUserId");
+
+        const token =
+            sessionStorage.getItem("firebaseIdToken");
+
+
+        // CHECK LOGIN
+        if (!userId || !token) {
+
+            window.location.replace("login.html");
+
+        }
+
+
+        // LOAD CUSTOMER ORDERS
+        async function loadCustomerOrders() {
+
+            const container =
+                document.getElementById("orders-list");
+
+            try {
+
+                console.log("Logged-in User ID:", userId);
+
+                // GET ORDERS FROM FIREBASE
+                const response =
+                    await getCustomerOrders(userId);
+
+                console.log("Firebase Orders Response:", response);
+
+                const orders = [];
+
+                // CONVERT FIRESTORE RESPONSE
+                if (Array.isArray(response)) {
+
+                    response.forEach(function (result) {
+
+                        if (result.document) {
+
+                            const orderData =
+                                convertFromFirestoreDocument(
+                                    result.document
+                                );
+
+                            // Use document ID as fallback
+                            if (!orderData.order_id) {
+                                orderData.order_id =
+                                    result.document.name.split("/").pop();
+                            }
+
+                            orders.push(orderData);
+
+                        }
+
+                    });
+
+                }
+
+                displayOrders(orders);
+
+            } catch (error) {
+
+                console.error("My Orders Error:", error);
+
+                container.textContent =
+                    "Unable to load orders. Check the browser console.";
+
+            }
+
+        }
+
+
+        // DISPLAY ORDERS
+        function displayOrders(orders) {
+
+            const container =
+                document.getElementById("orders-list");
+
+            container.innerHTML = "";
+
+            if (orders.length === 0) {
+
+                container.innerHTML = `
+                    <div class="empty-orders">
+                        <h2>No Orders Found</h2>
+                        <p>Your Firebase account has no matching orders.</p>
+                        <a href="products.html">Continue Shopping</a>
+                    </div>
+                `;
+
+                return;
+
+            }
+
+            orders.reverse();
+
+            orders.forEach(function (order) {
+
+                const card =
+                    document.createElement("div");
+
+                card.className = "order-card";
+
+                const header =
+                    document.createElement("div");
+
+                header.className = "order-header";
+
+                const heading =
+                    document.createElement("h3");
+
+                heading.textContent =
+                    "Order ID: " + order.order_id;
+
+                const status =
+                    document.createElement("span");
+
+                status.className = "order-status";
+
+                status.textContent =
+                    order.order_status || "Pending";
+
+                header.appendChild(heading);
+                header.appendChild(status);
+
+                const details =
+                    document.createElement("div");
+
+                details.className = "order-details";
+
+                function addDetail(label, value) {
+
+                    const paragraph =
+                        document.createElement("p");
+
+                    paragraph.textContent =
+                        label + ": " + (value || "-");
+
+                    details.appendChild(paragraph);
+
+                }
+
+                addDetail("Customer", order.customer_name);
+                addDetail("Phone", order.phone);
+                addDetail(
+                    "Delivery Address",
+                    [
+                        order.shipping_address,
+                        order.city,
+                        order.pincode
+                    ].filter(Boolean).join(", ")
+                );
+
+                addDetail(
+                    "Payment Method",
+                    "Cash on Delivery"
+                );
+
+                addDetail(
+                    "Payment Status",
+                    order.payment_status || "Pending"
+                );
+
+                const productsHeading =
+                    document.createElement("h4");
+
+                productsHeading.textContent =
+                    "Ordered Products";
+
+                details.appendChild(productsHeading);
+
+                const products =
+                    document.createElement("div");
+
+                products.className = "order-products";
+
+                (order.items || []).forEach(function (item) {
+
+                    const product =
+                        document.createElement("p");
+
+                    product.textContent =
+                        item.title +
+                        " × " +
+                        item.quantity +
+                        " = ₹" +
+                        (
+                            Number(item.price) *
+                            Number(item.quantity)
+                        ).toFixed(2);
+
+                    products.appendChild(product);
+
+                });
+
+                details.appendChild(products);
+
+                const total =
+                    document.createElement("p");
+
+                total.className = "order-total";
+
+                total.textContent =
+                    "Total Amount: ₹" +
+                    Number(order.total_amount || 0).toFixed(2);
+
+                details.appendChild(total);
+
+                card.appendChild(header);
+                card.appendChild(details);
+
+                container.appendChild(card);
+
+            });
+
+        }
+
+
+        // START PAGE
+        loadCustomerOrders();
+
+    </script>
+
+    <script src="js/auth-navigation.js"></script>
+
+</body>
+
+</html>

@@ -45,16 +45,21 @@ async function getOrderById(orderId) {
 
 
 // GET CUSTOMER ORDER HISTORY
+// GET CUSTOMER ORDER HISTORY
 async function getCustomerOrders(userId) {
 
     const query = {
         structuredQuery: {
             from: [
-                { collectionId: "orders" }
+                {
+                    collectionId: "orders"
+                }
             ],
             where: {
                 fieldFilter: {
-                    field: { fieldPath: "user_id" },
+                    field: {
+                        fieldPath: "user_id"
+                    },
                     op: "EQUAL",
                     value: {
                         stringValue: userId
@@ -65,7 +70,7 @@ async function getCustomerOrders(userId) {
     };
 
     return sendFirestoreRequest(
-        "orders:runQuery",
+        ":runQuery",
         "POST",
         query,
         sessionStorage.getItem("firebaseIdToken")

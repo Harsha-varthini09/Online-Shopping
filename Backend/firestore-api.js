@@ -9,8 +9,9 @@ function sendFirestoreRequest(
 
         const xhr = new XMLHttpRequest();
 
-        const url =
-            `${FIRESTORE_BASE_URL}/${documentPath}`;
+        const url = documentPath.startsWith(":")
+    ? `${FIRESTORE_BASE_URL}${documentPath}`
+    : `${FIRESTORE_BASE_URL}/${documentPath}`;
 
         xhr.open(method, url, true);
         console.log(
@@ -40,10 +41,19 @@ function sendFirestoreRequest(
                 : null;
 
             if (xhr.status >= 200 && xhr.status < 300) {
-                resolve(response);
-            } else {
-                reject(response);
-            }
+    resolve(response);
+} else {
+    console.error("Firestore Error Status:", xhr.status);
+    console.error(
+    "Firestore Error Details:",
+    JSON.stringify(response, null, 2)
+);
+
+    reject({
+        status: xhr.status,
+        error: response.error || response
+    });
+}
         };
 
         xhr.onerror = function () {

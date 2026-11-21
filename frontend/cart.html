@@ -6,118 +6,510 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>My Cart | Elegance Store</title>
+    <title>My Cart - Online Shopping</title>
 
     <link rel="stylesheet" href="css/style.css">
 
     <style>
-        .cart-section {
-            min-height: 70vh;
-            padding: 60px 8%;
+        body {
+            background: #FFF9F2;
+            color: #4B4352;
+            font-family: Arial, sans-serif;
+            margin: 0;
         }
 
-        .cart-heading {
+        .cart-container {
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .cart-title {
             text-align: center;
-            margin-bottom: 35px;
+            color: #493B59;
+            margin-bottom: 30px;
         }
 
         .cart-card {
-            max-width: 900px;
-            margin: auto;
-            padding: 35px;
-            background: white;
-            border-radius: 20px;
-            box-shadow: var(--shadow);
+            background: #FFFFFF;
+            padding: 25px;
+            border-radius: 14px;
+            box-shadow: 0 4px 15px rgba(73, 59, 89, 0.08);
+        }
+
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            padding: 20px 0;
+            border-bottom: 1px solid #EAE1ED;
+        }
+
+        .cart-item-details {
+            flex: 1;
+        }
+
+        .cart-item h3 {
+            color: #493B59;
+            margin: 0 0 8px;
+        }
+
+        .cart-price {
+            color: #C77D91;
+            font-weight: bold;
+        }
+
+        .quantity-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .quantity-controls button {
+            background: #B8A4D9;
+            color: white;
+            border: none;
+            padding: 7px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .remove-btn {
+            background: #C77D91 !important;
+        }
+
+        .cart-summary {
+            margin-top: 25px;
+            text-align: right;
+        }
+
+        .cart-summary h2 {
+            color: #493B59;
+        }
+
+        .cart-buttons {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 25px;
+        }
+
+        .cart-btn {
+            padding: 12px 22px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .continue-btn {
+            background: #F2C6D0;
+            color: #493B59;
+        }
+
+        .checkout-btn {
+            background: #B8A4D9;
+            color: white;
+            font-weight: bold;
+        }
+
+        .clear-btn {
+            background: #C77D91;
+            color: white;
         }
 
         .empty-cart {
             text-align: center;
-            padding: 40px 10px;
+            padding: 40px 15px;
+            color: #8C8492;
         }
 
-        .empty-cart p {
-            margin: 15px 0 25px;
+        .empty-cart h2 {
+            color: #493B59;
         }
 
-        .cart-icon {
-            font-size: 55px;
+        .cart-message {
+            margin-top: 15px;
+            color: #a00000;
         }
 
-        @media (max-width: 600px) {
-            .cart-card {
-                padding: 22px;
+        @media (max-width: 650px) {
+            .cart-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .cart-buttons {
+                flex-direction: column;
+            }
+
+            .cart-btn {
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .cart-summary {
+                text-align: left;
             }
         }
     </style>
 </head>
 
 <body>
-
-    <!-- NAVIGATION BAR -->
-
-    <nav class="navbar">
-
-        <a href="index.html" class="logo">
-            Elegance.
-        </a>
-
-        <ul class="nav-links">
-
-            <li><a href="index.html">Home</a></li>
-
-            <li><a href="products.html">Products</a></li>
-
-            <li><a href="cart.html">Cart</a></li>
-
-        </ul>
-
-    </nav>
-
-
+<nav>
+    <a href="my-orders.html">My Orders</a>
+</nav>
     <!-- CART SECTION -->
+    <main class="cart-container">
 
-    <section class="cart-section">
-
-        <div class="cart-heading">
-
-            <h1>My Shopping Cart</h1>
-
-            <p>Review the products you have selected.</p>
-
-        </div>
+        <h1 class="cart-title">My Shopping Cart</h1>
 
         <div class="cart-card">
 
-            <div class="empty-cart">
+            <div id="cart-items">
+                Loading cart items...
+            </div>
 
-                <div class="cart-icon">🛒</div>
+            <div id="cart-summary" class="cart-summary"
+                style="display: none;">
 
-                <h2>Your Cart is Empty</h2>
-
-                <p>
-                    You haven't added any products to your cart yet.
-                </p>
-
-                <a href="products.html" class="btn">
-                    Continue Shopping
-                </a>
+                <h2>
+                    Total: ₹<span id="cart-total">0.00</span>
+                </h2>
 
             </div>
 
+            <div class="cart-buttons">
+
+                <a href="products.html"
+                    class="cart-btn continue-btn">
+                    Continue Shopping
+                </a>
+
+                <button type="button"
+                    class="cart-btn clear-btn"
+                    id="clear-cart-btn"
+                    onclick="clearCart()">
+                    Clear Cart
+                </button>
+
+                <button type="button"
+                    class="cart-btn checkout-btn"
+                    id="checkout-btn"
+                    onclick="proceedToCheckout()">
+                    Proceed to Checkout
+                </button>
+
+            </div>
+
+            <p id="cart-message" class="cart-message"></p>
+
         </div>
 
-    </section>
+    </main>
+
+    <!-- BACKEND FILES -->
+    <script src="../Backend/firebase-config.js"></script>
+    <script src="../Backend/firestore-api.js"></script>
+    <script src="../Backend/utility.js"></script>
+    <script src="../Backend/cart-api.js"></script>
+
+    <!-- CART JAVASCRIPT -->
+    <script>
+
+        let cartItems = [];
+
+        const userId =
+            sessionStorage.getItem("firebaseUserId");
+
+        const token =
+            sessionStorage.getItem("firebaseIdToken");
 
 
-    <!-- FOOTER -->
+        // CHECK LOGIN
+        if (!userId || !token) {
 
-    <footer class="footer">
+            window.location.replace("login.html");
 
-        <p>
-            © 2026 Elegance Store. All Rights Reserved.
-        </p>
+        }
 
-    </footer>
+
+        // LOAD CART
+        async function loadCartPage() {
+
+            try {
+
+                const response = await getCart(userId);
+
+                const cartData =
+                    convertFromFirestoreDocument(response);
+
+                cartItems = cartData.items || [];
+
+                displayCartItems();
+
+            } catch (error) {
+
+                console.error("Cart Loading Error:", error);
+
+                if (error.error?.status === "NOT_FOUND") {
+
+                    cartItems = [];
+                    displayCartItems();
+
+                } else {
+
+                    document.getElementById("cart-items")
+                        .textContent =
+                        "Unable to load your cart. Please try again.";
+
+                }
+
+            }
+
+        }
+
+
+        // DISPLAY CART ITEMS
+        function displayCartItems() {
+
+            const container =
+                document.getElementById("cart-items");
+
+            const summary =
+                document.getElementById("cart-summary");
+
+            const checkoutButton =
+                document.getElementById("checkout-btn");
+
+            const clearButton =
+                document.getElementById("clear-cart-btn");
+
+            container.innerHTML = "";
+
+            if (cartItems.length === 0) {
+
+                container.innerHTML = `
+                    <div class="empty-cart">
+                        <h2>Your Cart is Empty</h2>
+                        <p>Add products to your cart to continue shopping.</p>
+                    </div>
+                `;
+
+                summary.style.display = "none";
+                checkoutButton.disabled = true;
+                checkoutButton.style.opacity = "0.5";
+                clearButton.disabled = true;
+
+                return;
+
+            }
+
+            checkoutButton.disabled = false;
+            checkoutButton.style.opacity = "1";
+            clearButton.disabled = false;
+
+            let total = 0;
+
+            cartItems.forEach(function (item, index) {
+
+                const price = Number(item.price);
+                const quantity = Number(item.quantity);
+
+                const subtotal = price * quantity;
+
+                total += subtotal;
+
+                const itemDiv =
+                    document.createElement("div");
+
+                itemDiv.className = "cart-item";
+
+                const details =
+                    document.createElement("div");
+
+                details.className = "cart-item-details";
+
+                const title =
+                    document.createElement("h3");
+
+                title.textContent = item.title;
+
+                const priceText =
+                    document.createElement("p");
+
+                priceText.className = "cart-price";
+
+                priceText.textContent =
+                    "Price: ₹" + price.toFixed(2);
+
+                const subtotalText =
+                    document.createElement("p");
+
+                subtotalText.textContent =
+                    "Subtotal: ₹" + subtotal.toFixed(2);
+
+                const controls =
+                    document.createElement("div");
+
+                controls.className = "quantity-controls";
+
+                const decreaseButton =
+                    document.createElement("button");
+
+                decreaseButton.textContent = "-";
+
+                decreaseButton.onclick = function () {
+                    updateQuantity(index, -1);
+                };
+
+                const quantityText =
+                    document.createElement("span");
+
+                quantityText.textContent = quantity;
+
+                const increaseButton =
+                    document.createElement("button");
+
+                increaseButton.textContent = "+";
+
+                increaseButton.onclick = function () {
+                    updateQuantity(index, 1);
+                };
+
+                const removeButton =
+                    document.createElement("button");
+
+                removeButton.textContent = "Remove";
+
+                removeButton.className = "remove-btn";
+
+                removeButton.onclick = function () {
+                    removeItem(index);
+                };
+
+                controls.appendChild(decreaseButton);
+                controls.appendChild(quantityText);
+                controls.appendChild(increaseButton);
+                controls.appendChild(removeButton);
+
+                details.appendChild(title);
+                details.appendChild(priceText);
+                details.appendChild(subtotalText);
+                details.appendChild(controls);
+
+                itemDiv.appendChild(details);
+
+                container.appendChild(itemDiv);
+
+            });
+
+            document.getElementById("cart-total")
+                .textContent = total.toFixed(2);
+
+            summary.style.display = "block";
+
+        }
+
+
+        // UPDATE QUANTITY
+        async function updateQuantity(index, change) {
+
+            const newQuantity =
+                cartItems[index].quantity + change;
+
+            if (newQuantity <= 0) {
+
+                removeItem(index);
+                return;
+
+            }
+
+            cartItems[index].quantity = newQuantity;
+
+            await updateCartInFirebase();
+
+        }
+
+
+        // REMOVE ITEM
+        async function removeItem(index) {
+
+            cartItems.splice(index, 1);
+
+            await updateCartInFirebase();
+
+        }
+
+
+        // CLEAR CART
+        async function clearCart() {
+
+            if (!confirm("Are you sure you want to clear your cart?")) {
+                return;
+            }
+
+            cartItems = [];
+
+            await updateCartInFirebase();
+
+        }
+
+
+        // SAVE CART CHANGES
+        async function updateCartInFirebase() {
+
+            try {
+
+                await saveCart(userId, cartItems);
+
+                displayCartItems();
+
+                document.getElementById("cart-message")
+                    .textContent = "";
+
+            } catch (error) {
+
+                console.error("Cart Update Error:", error);
+
+                document.getElementById("cart-message")
+                    .textContent =
+                    "Unable to update cart. Please try again.";
+
+            }
+
+        }
+
+
+        // PROCEED TO CHECKOUT
+        function proceedToCheckout() {
+
+            if (cartItems.length === 0) {
+
+                alert("Your cart is empty. Add products first.");
+
+                return;
+
+            }
+
+            window.location.href = "checkout.html";
+
+        }
+
+
+        // START CART PAGE
+        loadCartPage();
+
+    </script>
+
+    <!-- AUTH NAVIGATION -->
+    <script src="js/auth-navigation.js"></script>
 
 </body>
 
